@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: DalTime Scheduling Application Backend
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs24.x
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        NODE_ENV: development
+
+Resources:
+  TestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: test.handler
+      Events:
+        TestApi:
+          Type: HttpApi
+          Properties:
+            Path: /test
+            Method: GET
+
+Outputs:
+  TestApi:
+    Description: "HTTP API endpoint URL for test function"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/test"
+  TestFunction:
+    Description: "Test Lambda Function ARN"
+    Value: !GetAtt TestFunction.Arn

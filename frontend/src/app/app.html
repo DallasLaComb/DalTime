@@ -1,0 +1,30 @@
+<h1>DalTime Authentication</h1>
+
+<div *ngIf="!isAuthenticated">
+  <p>Not authenticated</p>
+  <button (click)="login()">Login</button>
+</div>
+
+<div *ngIf="isAuthenticated">
+  <p>Authenticated</p>
+
+  <h3>User Groups:</h3>
+  <p *ngIf="userGroups.length > 0"><strong>{{ userGroups.join(', ') }}</strong></p>
+  <p *ngIf="userGroups.length === 0"><em>No groups assigned</em></p>
+
+  <h3>Organization ID:</h3>
+  <p *ngIf="orgId"><strong>{{ orgId }}</strong></p>
+  <p *ngIf="!orgId"><em>Not set</em></p>
+
+  <h3>User Info:</h3>
+  <pre>{{ userData | json }}</pre>
+
+  <h3>Access Token:</h3>
+  <pre>{{ accessToken }}</pre>
+
+  <h3>ID Token:</h3>
+  <pre>{{ idToken }}</pre>
+
+  <button (click)="getTokenForApi()">Log Token</button>
+  <button (click)="logout()">Logout</button>
+</div>
