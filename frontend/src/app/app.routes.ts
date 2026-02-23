@@ -6,8 +6,7 @@ export const routes: Routes = [
   // OIDC callback — public, renders while checkAuth() processes the authorization code
   {
     path: 'sso',
-    loadComponent: () =>
-      import('./features/auth/callback.component').then((m) => m.CallbackComponent),
+    loadComponent: () => import('./core/auth/callback.component').then((m) => m.CallbackComponent),
   },
 
   // Unauthorized — public, shows access denied with role info
@@ -61,8 +60,7 @@ export const routes: Routes = [
     path: '',
     pathMatch: 'full',
     canMatch: [authGuard],
-    loadComponent: () =>
-      import('./features/auth/callback.component').then((m) => m.CallbackComponent),
+    loadComponent: () => import('./core/auth/callback.component').then((m) => m.CallbackComponent),
   },
 
   // 404 — catch-all for unknown routes
