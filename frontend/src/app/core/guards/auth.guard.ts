@@ -13,6 +13,11 @@ export const authGuard: CanMatchFn = () => {
     first(),
     map((isAuthenticated) => {
       if (!isAuthenticated) {
+        if (auth.isLoggedOut) {
+          console.log('[AuthGuard] User logged out — skipping auto-login');
+          return false;
+        }
+        console.log('[AuthGuard] Not authenticated — triggering login');
         auth.login();
         return false;
       }

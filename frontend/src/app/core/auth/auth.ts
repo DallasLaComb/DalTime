@@ -44,12 +44,21 @@ export class AuthService {
 
   // --- Signals for template binding ---
   readonly isAuthenticatedSignal = toSignal(this.isAuthenticated$, { initialValue: false });
+  readonly userSignal = toSignal(this.user$, { initialValue: null });
   readonly roleSignal = toSignal(this.role$, { initialValue: null });
 
   // --- Scalar state (used by Cognito SDK calls) ---
   accessToken: string | null = null;
   idToken: string | null = null;
   orgId: string | null = null;
+
+  /** True after explicit logout — prevents authGuard from auto-triggering login. */
+  private _loggedOut = false;
+
+  /** Whether the user explicitly logged out (checked by authGuard). */
+  get isLoggedOut(): boolean {
+    return this._loggedOut;
+  }
 
   initialize(): void {
     // checkAuth() detects code+state params in the URL automatically and exchanges for tokens.
@@ -95,6 +104,9 @@ export class AuthService {
   }
 
   login(): void {
+    console.log('[Auth] login() called — clearing loggedOut flag');
+    this._loggedOut = false;
+
     // Clear stale cached tokens so the next login gets fresh tokens with correct scopes.
     // Without this, old tokens (possibly missing aws.cognito.signin.user.admin) persist in storage.
     this.oidcSecurityService.logoffLocal();
@@ -105,13 +117,21 @@ export class AuthService {
   }
 
   logout(): void {
+    console.log('[Auth] logout() called');
+    console.log('[Auth] Clearing role, tokens, and orgId');
     this._role$.next(null);
     this.accessToken = null;
     this.idToken = null;
     this.orgId = null;
 
-    this.oidcSecurityService.logoff().subscribe((result) => {
-      console.log('Logout complete:', result);
+    console.log('[Auth] Calling logoff() to clear local session and redirect to Cognito logout');
+    this.oidcSecurityService.logoff().subscribe({
+      next: (result) => console.log('[Auth] Logout result:', result),
+      error: (err) => {
+        console.error('[Auth] Logout failed, falling back to logoffLocal():', err);
+        this.oidcSecurityService.logoffLocal();
+        this.router.navigate(['/']);
+      },
     });
   }
 

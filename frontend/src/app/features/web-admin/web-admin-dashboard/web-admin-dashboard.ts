@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { AuthService } from '../../../core/auth/auth';
 
 @Component({
   selector: 'app-web-admin-dashboard',
@@ -7,5 +8,7 @@ import { Component } from '@angular/core';
   styleUrl: './web-admin-dashboard.css',
 })
 export class WebAdminDashboard {
-
+  protected readonly authService = inject(AuthService);
+  protected readonly user = this.authService.userSignal;
+  protected readonly role = this.authService.roleSignal;
 }

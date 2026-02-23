@@ -1,1 +1,31 @@
-<p>employee-dashboard works!</p>
+<h2>Employee Dashboard</h2>
+
+<section>
+  <h3>User Profile</h3>
+  @if (user()) {
+    <dl>
+      <dt>Role</dt>
+      <dd>{{ role() }}</dd>
+      <dt>Email</dt>
+      <dd>{{ user().email }}</dd>
+      <dt>Name</dt>
+      <dd>{{ user().name || user().given_name + ' ' + user().family_name }}</dd>
+      <dt>User Type</dt>
+      <dd>{{ user()['custom:user_type'] }}</dd>
+      <dt>Org ID</dt>
+      <dd>{{ user()['custom:org_id'] || 'N/A' }}</dd>
+      <dt>Sub</dt>
+      <dd>{{ user().sub }}</dd>
+    </dl>
+  }
+</section>
+
+<section>
+  <h3>Access Token</h3>
+  <pre>{{ authService.accessToken }}</pre>
+</section>
+
+<section>
+  <h3>ID Token</h3>
+  <pre>{{ authService.idToken }}</pre>
+</section>
