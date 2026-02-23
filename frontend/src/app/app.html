@@ -1,11 +1,6 @@
-<header>
-  <h1>DalTime</h1>
-  @if (authService.isAuthenticatedSignal()) {
-    <button (click)="authService.logout()">Sign Out</button>
-  } @else {
-    <button (click)="authService.login()">Sign In</button>
-  }
-</header>
+@if (authService.isAuthenticatedSignal()) {
+  <app-navbar />
+}
 
 <main>
   <router-outlet />

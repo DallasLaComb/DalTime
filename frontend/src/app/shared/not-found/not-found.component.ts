@@ -6,13 +6,17 @@ import { ROLE_DASHBOARD_MAP } from '../../core/auth/user-role.model';
 @Component({
   selector: 'app-not-found',
   template: `
-    <div class="not-found-container">
-      <h2>404 - Page Not Found</h2>
-      <p>The page you are looking for does not exist.</p>
+    <div class="d-flex flex-column align-items-center justify-content-center min-vh-100 bg-light text-center px-3">
+      <img src="daltime-logo.png" alt="DalTime" height="64" class="mb-4" />
+      <h1 class="display-1 fw-bold text-dark mb-0">404</h1>
+      <h2 class="h4 fw-semibold text-secondary mb-3">Page Not Found</h2>
+      <p class="text-muted mb-4" style="max-width: 420px;">
+        The page you're looking for doesn't exist or may have been moved.
+      </p>
       @if (role()) {
-        <button (click)="goToDashboard()">Go to My Dashboard</button>
+        <button class="btn btn-dark btn-lg px-5" (click)="goToDashboard()">Back to Dashboard</button>
       } @else {
-        <button (click)="login()">Sign In</button>
+        <button class="btn btn-dark btn-lg px-5" (click)="login()">Sign In</button>
       }
     </div>
   `,
