@@ -18,6 +18,15 @@ export const routes: Routes = [
 
   // Role-protected dashboards
   {
+    path: 'web-admin/organizations',
+    canMatch: [authGuard, roleGuard],
+    data: { roles: ['WebAdmin'] as const },
+    loadComponent: () =>
+      import('./features/web-admin/organizations/organizations').then(
+        (m) => m.OrganizationsComponent,
+      ),
+  },
+  {
     path: 'web-admin',
     canMatch: [authGuard, roleGuard],
     data: { roles: ['WebAdmin'] as const },

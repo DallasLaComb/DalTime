@@ -22,7 +22,7 @@
     {
       "label": "Backend: Start Local API",
       "type": "shell",
-      "command": "sam local start-api --template template.yaml --port 3000",
+      "command": "sam local start-api --port 3000 --env-vars local/env.json",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -149,13 +149,64 @@
       }
     },
     {
-      "label": "Start Full Stack (with install)",
+      "label": "Install All Dependencies",
       "dependsOn": [
         "Backend: Install Dependencies",
-        "Frontend: Install Dependencies",
+        "Frontend: Install Dependencies"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "DynamoDB Local: Start",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": {
+        "cwd": "${workspaceFolder}/backend/local"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "dependsOn": ["Docker: Ensure Running"]
+    },
+    {
+      "label": "DynamoDB Local: Create Tables",
+      "type": "shell",
+      "command": "bash local/create-tables.sh",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "dependsOn": ["DynamoDB Local: Start"]
+    },
+    {
+      "label": "DynamoDB Local: Stop",
+      "type": "shell",
+      "command": "docker compose down",
+      "options": {
+        "cwd": "${workspaceFolder}/backend/local"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Start Full Stack (with install)",
+      "dependsOn": [
+        "Install All Dependencies",
+        "DynamoDB Local: Create Tables",
         "Backend: Start Local API",
         "Frontend: Start Dev Server"
       ],
+      "dependsOrder": "sequence",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -165,9 +216,11 @@
     {
       "label": "Start Full Stack",
       "dependsOn": [
+        "DynamoDB Local: Create Tables",
         "Backend: Start Local API",
         "Frontend: Start Dev Server"
       ],
+      "dependsOrder": "sequence",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
