@@ -21,6 +21,13 @@ export const appConfig: ApplicationConfig = {
         silentRenew: false,
         useRefreshToken: false,
         renewTimeBeforeTokenExpiresInSeconds: 30,
+        authWellknownEndpoints: {
+          endSessionEndpoint: `https://${environment.cognito.domain}/logout`,
+        },
+        customParamsEndSessionRequest: {
+          client_id: environment.cognito.clientId,
+          logout_uri: window.location.origin,
+        },
         secureRoutes: [],
       },
     }),

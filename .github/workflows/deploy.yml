@@ -2,7 +2,7 @@ name: Build & Deploy
 
 on:
   push:
-    branches: [dev, test, main]
+    branches: [dev, qa, main]
 
 permissions:
   id-token: write
