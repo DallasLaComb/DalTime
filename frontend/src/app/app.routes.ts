@@ -65,6 +65,10 @@ export const routes: Routes = [
       import('./features/auth/callback.component').then((m) => m.CallbackComponent),
   },
 
-  // Wildcard fallback
-  { path: '**', redirectTo: '' },
+  // 404 — catch-all for unknown routes
+  {
+    path: '**',
+    loadComponent: () =>
+      import('./features/not-found/not-found.component').then((m) => m.NotFoundComponent),
+  },
 ];
