@@ -23,28 +23,36 @@ export const routes: Routes = [
     canMatch: [authGuard, roleGuard],
     data: { roles: ['WebAdmin'] as const },
     loadComponent: () =>
-      import('./features/web-admin/web-admin.component').then((m) => m.WebAdminComponent),
+      import('./features/web-admin/web-admin-dashboard/web-admin-dashboard').then(
+        (m) => m.WebAdminDashboard,
+      ),
   },
   {
     path: 'org-admin',
     canMatch: [authGuard, roleGuard],
     data: { roles: ['OrgAdmin'] as const },
     loadComponent: () =>
-      import('./features/org-admin/org-admin.component').then((m) => m.OrgAdminComponent),
+      import('./features/org-admin/org-admin-dashboard/org-admin-dashboard').then(
+        (m) => m.OrgAdminDashboard,
+      ),
   },
   {
     path: 'manager',
     canMatch: [authGuard, roleGuard],
     data: { roles: ['Manager'] as const },
     loadComponent: () =>
-      import('./features/manager/manager.component').then((m) => m.ManagerComponent),
+      import('./features/manager/manager-dashboard/manager-dashboard').then(
+        (m) => m.ManagerDashboard,
+      ),
   },
   {
     path: 'employee',
     canMatch: [authGuard, roleGuard],
     data: { roles: ['Employee'] as const },
     loadComponent: () =>
-      import('./features/employee/employee.component').then((m) => m.EmployeeComponent),
+      import('./features/employee/employee-dashboard/employee-dashboard').then(
+        (m) => m.EmployeeDashboard,
+      ),
   },
 
   // Root: authGuard triggers login for unauthenticated users;
