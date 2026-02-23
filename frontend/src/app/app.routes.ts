@@ -14,7 +14,7 @@ export const routes: Routes = [
   {
     path: 'unauthorized',
     loadComponent: () =>
-      import('./features/unauthorized/unauthorized.component').then((m) => m.UnauthorizedComponent),
+      import('./shared/unauthorized/unauthorized.component').then((m) => m.UnauthorizedComponent),
   },
 
   // Role-protected dashboards
@@ -69,6 +69,6 @@ export const routes: Routes = [
   {
     path: '**',
     loadComponent: () =>
-      import('./features/not-found/not-found.component').then((m) => m.NotFoundComponent),
+      import('./shared/not-found/not-found.component').then((m) => m.NotFoundComponent),
   },
 ];
