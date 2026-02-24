@@ -22,12 +22,37 @@ Globals:
 Resources:
 
   # ------------------------------------------------------------------ #
-  # HTTP API — explicit resource so we can attach a JWT authorizer and  #
-  # configure CORS in one place for all routes.                         #
+  # CloudWatch — Log groups with 1-day retention                        #
+  # ------------------------------------------------------------------ #
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}/access-logs"
+      RetentionInDays: 1
+
+  OrganizationsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
+      RetentionInDays: 1
+
+  # ------------------------------------------------------------------ #
+  # HTTP API — JWT authorizer, CORS, and access logging                 #
   # ------------------------------------------------------------------ #
   DalTimeHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      StageName: $default
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: >-
+          {"requestId":"$context.requestId","ip":"$context.identity.sourceIp",
+          "method":"$context.httpMethod","path":"$context.path",
+          "status":"$context.status","protocol":"$context.protocol",
+          "responseLength":"$context.responseLength",
+          "integrationError":"$context.integrationErrorMessage",
+          "error":"$context.error.message",
+          "integrationStatus":"$context.integration.integrationStatus"}
       Auth:
         DefaultAuthorizer: CognitoJwtAuthorizer
         Authorizers:
@@ -89,7 +114,11 @@ Resources:
   # ------------------------------------------------------------------ #
   OrganizationsFunction:
     Type: AWS::Serverless::Function
+    DependsOn: OrganizationsFunctionLogGroup
     Properties:
+      FunctionName: !Sub "${AWS::StackName}-OrganizationsFunction"
+      LoggingConfig:
+        LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
       CodeUri: .
       Handler: src/functions/web-admin/organizations/main.handler
       Events:
@@ -173,24 +202,6 @@ Resources:
         External:
           - "@aws-sdk/*"
 
-  # ------------------------------------------------------------------ #
-  # Test Function — moved to explicit API, auth bypassed               #
-  # ------------------------------------------------------------------ #
-  TestFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/functions/
-      Handler: test.handler
-      Events:
-        TestApi:
-          Type: HttpApi
-          Properties:
-            Path: /test
-            Method: GET
-            ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
-
 Outputs:
   ApiEndpoint:
     Description: "HTTP API base URL"
@@ -204,6 +215,3 @@ Outputs:
   DalTimeTable:
     Description: "DynamoDB single-table name"
     Value: !Ref DalTimeTable
-  TestEndpoint:
-    Description: "Test endpoint (no auth)"
-    Value: !Sub "https://${DalTimeHttpApi}.execute-api.${AWS::Region}.amazonaws.com/test"
