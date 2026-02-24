@@ -18,8 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── Frontend Build ──
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -29,71 +27,15 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
 
-      - name: Validate required environment variables
-        run: |
-          missing=()
-          [ -z "$VITE_COGNITO_USER_POOL_ID" ] && missing+=("VITE_COGNITO_USER_POOL_ID")
-          [ -z "$VITE_COGNITO_CLIENT_ID" ] && missing+=("VITE_COGNITO_CLIENT_ID")
-          [ -z "$VITE_COGNITO_REGION" ] && missing+=("VITE_COGNITO_REGION")
-          [ -z "$VITE_COGNITO_DOMAIN" ] && missing+=("VITE_COGNITO_DOMAIN")
-          [ -z "$VITE_API_BASE_URL" ] && missing+=("VITE_API_BASE_URL")
-          
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing required environment variables: ${missing[*]}"
-            exit 1
-          fi
-          echo "✓ All required environment variables are set"
-        env:
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION }}
-          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+      # ── AWS Authentication (needed before backend deploy) ──
 
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Inject environment variables into build
-        working-directory: frontend
-        run: |
-          # Replace placeholders in all environment files with actual values
-          ENV_FILES="src/environments/environment.ts src/environments/environment.prod.ts src/environments/environment.testing.ts"
-          sed -i "s|__VITE_COGNITO_USER_POOL_ID__|${VITE_COGNITO_USER_POOL_ID}|g" $ENV_FILES
-          sed -i "s|__VITE_COGNITO_CLIENT_ID__|${VITE_COGNITO_CLIENT_ID}|g" $ENV_FILES
-          sed -i "s|__VITE_COGNITO_REGION__|${VITE_COGNITO_REGION}|g" $ENV_FILES
-          sed -i "s|__VITE_COGNITO_DOMAIN__|${VITE_COGNITO_DOMAIN}|g" $ENV_FILES
-          sed -i "s|__VITE_API_BASE_URL__|${VITE_API_BASE_URL}|g" $ENV_FILES
-          echo "✓ Environment variables injected"
-        env:
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION }}
-          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-
-      - name: Build Angular app
-        run: npm run build -- --configuration production
-        working-directory: frontend
-
-      - name: Validate build output
-        working-directory: frontend
-        run: |
-          # Fail if any placeholder was not replaced
-          if grep -r "__VITE_" dist/; then
-            echo "::error::Build contains unresolved environment placeholders"
-            exit 1
-          fi
-          
-          # Fail if import.meta.env is still present in built JS (should be removed/replaced)
-          if grep -rE "import\.meta\.env" dist/**/*.js 2>/dev/null; then
-            echo "::error::Build contains unresolved import.meta.env references"
-            exit 1
-          fi
-          
-          echo "✓ Build validation passed"
-
-      # ── Backend Build ──
+      # ── Deploy Backend First ──
 
       - name: Install backend dependencies
         run: npm ci
@@ -118,30 +60,6 @@ jobs:
             echo "::notice::template.yaml is empty — skipping SAM build"
           fi
 
-      # ── AWS Authentication ──
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      # ── Deploy Frontend ──
-
-      - name: Sync frontend to S3
-        run: |
-          aws s3 sync frontend/dist/frontend/browser/ \
-            s3://${{ vars.S3_BUCKET_NAME }}/ \
-            --delete
-
-      - name: Invalidate CloudFront cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
-
-      # ── Deploy Backend ──
-
       - name: Deploy SAM stack
         run: |
           if [ -s backend/template.yaml ]; then
@@ -156,3 +74,92 @@ jobs:
           else
             echo "::notice::template.yaml is empty — skipping SAM deploy"
           fi
+
+      - name: Get API URL from stack outputs
+        id: stack-outputs
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ vars.SAM_STACK_NAME }} \
+            --region ${{ vars.AWS_REGION }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
+            --output text)
+          echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
+          echo "✓ API URL resolved from stack: ${API_URL}"
+
+      # ── Build & Deploy Frontend (using real API URL) ──
+
+      - name: Validate required environment variables
+        run: |
+          missing=()
+          [ -z "$VITE_COGNITO_USER_POOL_ID" ] && missing+=("VITE_COGNITO_USER_POOL_ID")
+          [ -z "$VITE_COGNITO_CLIENT_ID" ] && missing+=("VITE_COGNITO_CLIENT_ID")
+          [ -z "$VITE_COGNITO_REGION" ] && missing+=("VITE_COGNITO_REGION")
+          [ -z "$VITE_COGNITO_DOMAIN" ] && missing+=("VITE_COGNITO_DOMAIN")
+          [ -z "$VITE_API_BASE_URL" ] && missing+=("VITE_API_BASE_URL")
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required environment variables: ${missing[*]}"
+            exit 1
+          fi
+          echo "✓ All required environment variables are set"
+        env:
+          VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION }}
+          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
+          VITE_API_BASE_URL: ${{ steps.stack-outputs.outputs.api_url }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Inject environment variables into build
+        working-directory: frontend
+        run: |
+          # Replace placeholders in all environment files with actual values
+          ENV_FILES="src/environments/environment.ts src/environments/environment.prod.ts src/environments/environment.testing.ts"
+          sed -i "s|__VITE_COGNITO_USER_POOL_ID__|${VITE_COGNITO_USER_POOL_ID}|g" $ENV_FILES
+          sed -i "s|__VITE_COGNITO_CLIENT_ID__|${VITE_COGNITO_CLIENT_ID}|g" $ENV_FILES
+          sed -i "s|__VITE_COGNITO_REGION__|${VITE_COGNITO_REGION}|g" $ENV_FILES
+          sed -i "s|__VITE_COGNITO_DOMAIN__|${VITE_COGNITO_DOMAIN}|g" $ENV_FILES
+          sed -i "s|__VITE_API_BASE_URL__|${VITE_API_BASE_URL}|g" $ENV_FILES
+          echo "✓ Environment variables injected (API URL: ${VITE_API_BASE_URL})"
+        env:
+          VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION }}
+          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
+          VITE_API_BASE_URL: ${{ steps.stack-outputs.outputs.api_url }}
+
+      - name: Build Angular app
+        run: npm run build -- --configuration production
+        working-directory: frontend
+
+      - name: Validate build output
+        working-directory: frontend
+        run: |
+          # Fail if any placeholder was not replaced
+          if grep -r "__VITE_" dist/; then
+            echo "::error::Build contains unresolved environment placeholders"
+            exit 1
+          fi
+
+          # Fail if import.meta.env is still present in built JS (should be removed/replaced)
+          if grep -rE "import\.meta\.env" dist/**/*.js 2>/dev/null; then
+            echo "::error::Build contains unresolved import.meta.env references"
+            exit 1
+          fi
+
+          echo "✓ Build validation passed"
+
+      - name: Sync frontend to S3
+        run: |
+          aws s3 sync frontend/dist/frontend/browser/ \
+            s3://${{ vars.S3_BUCKET_NAME }}/ \
+            --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
