@@ -113,7 +113,7 @@ jobs:
       - name: Build SAM application
         run: |
           if [ -s backend/template.yaml ]; then
-            cd backend && sam build
+            cd backend && PATH="$PATH:$(pwd)/node_modules/.bin" sam build
           else
             echo "::notice::template.yaml is empty — skipping SAM build"
           fi
