@@ -1,15 +1,10 @@
 import type { APIGatewayProxyResultV2 } from 'aws-lambda';
 
-/**
- * CORS headers returned on every response.
- *
- * Access-Control-Allow-Origin matches the Angular dev server origin (port 4200).
- * Browsers send credentialed requests from that origin to the API at port 3000,
- * so the allowed origin must be the browser-side port, not the API port.
- */
+const ALLOWED_ORIGIN = process.env['ALLOWED_ORIGIN'] || 'http://localhost:4200';
+
 const CORS_HEADERS: Record<string, string> = {
   'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': 'http://localhost:4200',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Headers': 'Content-Type,Authorization',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
 };

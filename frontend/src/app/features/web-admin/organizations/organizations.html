@@ -35,6 +35,7 @@
         <table class="table table-hover align-middle">
           <thead class="table-light">
             <tr>
+              <th>ID</th>
               <th>Name</th>
               <th>Address</th>
               <th>Created</th>
@@ -44,6 +45,7 @@
           <tbody>
             @for (org of organizations(); track org.org_id) {
               <tr>
+                <td class="text-muted"><code>{{ org.org_id }}</code></td>
                 <td class="fw-semibold">{{ org.name }}</td>
                 <td>{{ org.address }}</td>
                 <td class="text-muted">{{ org.created_at | date: 'mediumDate' }}</td>

@@ -1,9 +1,7 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
-  DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
-  ScanCommand,
+  QueryCommand,
   UpdateCommand,
   DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
@@ -13,7 +11,7 @@ import type {
   Organization,
   CreateOrganizationBody,
   UpdateOrganizationBody,
-} from '../../shared/models/organization.model.js';
+} from '../../shared/models/web-admin/organization.model.js';
 import {
   ok,
   created,
@@ -22,17 +20,7 @@ import {
   notFound,
   internalError,
 } from '../../shared/response.js';
-
-// Initialised once outside handler — reused across warm invocations
-const dynamoConfig = process.env.DYNAMODB_ENDPOINT
-  ? { endpoint: process.env.DYNAMODB_ENDPOINT, region: process.env.AWS_DEFAULT_REGION ?? 'us-east-1' }
-  : {};
-console.log('DynamoDB config:', JSON.stringify(dynamoConfig));
-
-const client = new DynamoDBClient(dynamoConfig);
-const docClient = DynamoDBDocumentClient.from(client);
-
-const TABLE_NAME = process.env.ORGANIZATIONS_TABLE!;
+import { docClient, TABLE_NAME, GSI1_INDEX, stripKeys } from '../../shared/dynamo.js';
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
   const routeKey = event.routeKey; // format: "METHOD /path"
@@ -52,9 +40,14 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
     // ------------------------------------------------------------------ //
     if (routeKey === 'GET /organizations') {
       const result = await docClient.send(
-        new ScanCommand({ TableName: TABLE_NAME }),
+        new QueryCommand({
+          TableName: TABLE_NAME,
+          IndexName: GSI1_INDEX,
+          KeyConditionExpression: 'GSI1PK = :pk',
+          ExpressionAttributeValues: { ':pk': 'ORG' },
+        }),
       );
-      return ok(result.Items ?? []);
+      return ok((result.Items ?? []).map(stripKeys));
     }
 
     // ------------------------------------------------------------------ //
@@ -75,9 +68,14 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
       if (!body.name?.trim()) return badRequest('name is required');
       if (!body.address?.trim()) return badRequest('address is required');
 
+      const id = randomUUID();
       const now = new Date().toISOString();
       const org: Organization = {
-        org_id: randomUUID(),
+        PK: `ORG#${id}`,
+        SK: 'METADATA',
+        GSI1PK: 'ORG',
+        GSI1SK: now,
+        org_id: id,
         name: body.name.trim(),
         address: body.address.trim(),
         created_at: now,
@@ -86,7 +84,7 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
       };
 
       await docClient.send(new PutCommand({ TableName: TABLE_NAME, Item: org }));
-      return created(org);
+      return created(stripKeys(org));
     }
 
     // ------------------------------------------------------------------ //
@@ -98,14 +96,14 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
       const result = await docClient.send(
         new GetCommand({
           TableName: TABLE_NAME,
-          Key: { org_id: orgId },
+          Key: { PK: `ORG#${orgId}`, SK: 'METADATA' },
         }),
       );
 
       if (!result.Item) {
         return notFound(`Organization '${orgId}' not found`);
       }
-      return ok(result.Item);
+      return ok(stripKeys(result.Item));
     }
 
     // ------------------------------------------------------------------ //
@@ -124,7 +122,7 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
 
       // Confirm record exists before attempting update
       const existing = await docClient.send(
-        new GetCommand({ TableName: TABLE_NAME, Key: { org_id: orgId } }),
+        new GetCommand({ TableName: TABLE_NAME, Key: { PK: `ORG#${orgId}`, SK: 'METADATA' } }),
       );
       if (!existing.Item) {
         return notFound(`Organization '${orgId}' not found`);
@@ -136,7 +134,7 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
       const result = await docClient.send(
         new UpdateCommand({
           TableName: TABLE_NAME,
-          Key: { org_id: orgId },
+          Key: { PK: `ORG#${orgId}`, SK: 'METADATA' },
           UpdateExpression:
             'SET #name = :name, address = :address, updated_at = :updated_at',
           ExpressionAttributeNames: { '#name': 'name' },
@@ -149,7 +147,7 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
         }),
       );
 
-      return ok(result.Attributes);
+      return ok(stripKeys(result.Attributes as Record<string, unknown>));
     }
 
     // ------------------------------------------------------------------ //
@@ -160,14 +158,14 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
 
       // Confirm record exists — return 404 rather than silent no-op
       const existing = await docClient.send(
-        new GetCommand({ TableName: TABLE_NAME, Key: { org_id: orgId } }),
+        new GetCommand({ TableName: TABLE_NAME, Key: { PK: `ORG#${orgId}`, SK: 'METADATA' } }),
       );
       if (!existing.Item) {
         return notFound(`Organization '${orgId}' not found`);
       }
 
       await docClient.send(
-        new DeleteCommand({ TableName: TABLE_NAME, Key: { org_id: orgId } }),
+        new DeleteCommand({ TableName: TABLE_NAME, Key: { PK: `ORG#${orgId}`, SK: 'METADATA' } }),
       );
 
       return noContent();

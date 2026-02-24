@@ -2,6 +2,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: DalTime Scheduling Application Backend
 
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Default: "http://localhost:4200"
+    Description: "Frontend origin for CORS (e.g. https://daltime.example.com)"
+
 Globals:
   Function:
     Timeout: 30
@@ -11,6 +17,7 @@ Globals:
     Environment:
       Variables:
         NODE_ENV: development
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
 
 Resources:
 
@@ -32,7 +39,7 @@ Resources:
             IdentitySource: "$request.header.Authorization"
       CorsConfiguration:
         AllowOrigins:
-          - "http://localhost:4200"
+          - !Ref AllowedOrigin
         AllowHeaders:
           - "Content-Type"
           - "Authorization"
@@ -45,20 +52,37 @@ Resources:
         MaxAge: 300
 
   # ------------------------------------------------------------------ #
-  # DynamoDB — Organizations table                                      #
+  # DynamoDB — Single table for all entities                            #
   # PAY_PER_REQUEST billing — no capacity planning needed at this stage #
   # ------------------------------------------------------------------ #
-  OrganizationsTable:
+  DalTimeTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "daltime-organizations-${AWS::StackName}"
+      TableName: !Sub "daltime-${AWS::StackName}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: org_id
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
           AttributeType: S
       KeySchema:
-        - AttributeName: org_id
+        - AttributeName: PK
           KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
 
   # ------------------------------------------------------------------ #
   # Lambda — Organizations CRUD (single function, 5 routes)            #
@@ -129,11 +153,11 @@ Resources:
               Authorizer: NONE
       Environment:
         Variables:
-          ORGANIZATIONS_TABLE: !Ref OrganizationsTable
+          TABLE_NAME: !Ref DalTimeTable
           DYNAMODB_ENDPOINT: ""
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref OrganizationsTable
+            TableName: !Ref DalTimeTable
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -177,9 +201,9 @@ Outputs:
   OrganizationsFunction:
     Description: "Organizations Lambda Function ARN"
     Value: !GetAtt OrganizationsFunction.Arn
-  OrganizationsTable:
-    Description: "DynamoDB table name"
-    Value: !Ref OrganizationsTable
+  DalTimeTable:
+    Description: "DynamoDB single-table name"
+    Value: !Ref DalTimeTable
   TestEndpoint:
     Description: "Test endpoint (no auth)"
     Value: !Sub "https://${DalTimeHttpApi}.execute-api.${AWS::Region}.amazonaws.com/test"

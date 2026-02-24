@@ -1,8 +1,17 @@
 /**
  * Core Organization entity stored in DynamoDB.
- * org_id is the partition key (UUID).
+ *
+ * Single-table keys:
+ *   PK     = ORG#<org_id>
+ *   SK     = METADATA
+ *   GSI1PK = ORG
+ *   GSI1SK = <created_at>
  */
 export interface Organization {
+  PK: string;
+  SK: string;
+  GSI1PK: string;
+  GSI1SK: string;
   org_id: string;
   name: string;
   address: string;
