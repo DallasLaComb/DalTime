@@ -20,6 +20,10 @@ DalTime is a free, open-source shift scheduling web app designed specifically fo
 - **Mobile-friendly** — Staff can check schedules from any device
 - **Serverless architecture** — Scales automatically, minimal hosting costs
 
+## Architecture
+
+![DalTime Architecture](docs/architecture/diagram/DalTime%20Architecture.drawio.png)
+
 ## Tech Stack
 
 | Layer | Technology |
