@@ -74,6 +74,8 @@ cd frontend && npm start
 
 ## Testing
 
+For our testing approach and guidelines, see [Testing Philosophy](docs/testing-philosophy.md).
+
 | Type | Framework | Location |
 |------|-----------|----------|
 | Unit (Backend) | Jest | `backend/test/unit/` |
