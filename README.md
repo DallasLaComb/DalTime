@@ -72,6 +72,15 @@ cd backend && sam build && sam local start-api
 cd frontend && npm start
 ```
 
+## Testing
+
+| Type | Framework | Location |
+|------|-----------|----------|
+| Unit (Backend) | Jest | `backend/test/unit/` |
+| Unit (Frontend) | Jest | Co-located with each component/service |
+| Integration | Jest | `backend/test/integration/` |
+| E2E | Robot Framework | `robot/` |
+
 ## Contributing
 
 This project is built to help nonprofits. Contributions welcome!
