@@ -103,5 +103,6 @@ Location: `frontend/src/app/core/models/`
 - [ ] API changes documented
 - [ ] Model and access pattern changes documented
 - [ ] Feature manually tested
+- [ ] Responsive design verified (mobile, tablet, and desktop)
 - [ ] All lines of code are understood
 
