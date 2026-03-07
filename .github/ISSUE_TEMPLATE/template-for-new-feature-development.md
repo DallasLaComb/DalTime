@@ -1,28 +1,3 @@
----
-name: Template for new feature development
-about: Template for new feature development
-title: '[FEATURE]" '
-labels: ''
-assignees: ''
-
----
-
----
-name: Feature Story
-about: Template for new feature development
-title: "[FEATURE] "
-labels: feature
-assignees: ''
----
-
-## Overview
-
-**Feature Name:**
-**Description:**
-**Acceptance Criteria:**
-
----
-
 ## Data Model & Access Patterns
 
 **Entity affected:**
@@ -128,15 +103,5 @@ Location: `frontend/src/app/core/models/`
 - [ ] API changes documented
 - [ ] Model and access pattern changes documented
 - [ ] Feature manually tested
+- [ ] All lines of code are understood
 
----
-
-## Definition of Done
-
-- [ ] Business logic implemented and unit tested
-- [ ] DynamoDB model updated with integration tests
-- [ ] API endpoints tested
-- [ ] Frontend model updated and tested
-- [ ] E2E workflows covered
-- [ ] All tests passing
-- [ ] Documentation updated
