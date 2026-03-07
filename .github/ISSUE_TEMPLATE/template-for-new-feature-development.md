@@ -1,3 +1,11 @@
+---
+name: New Feature Development
+about: Template for planning and tracking new feature development
+title: ''
+labels: ''
+assignees: ''
+---
+
 ## Data Model & Access Patterns
 
 **Entity affected:**
