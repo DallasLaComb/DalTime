@@ -1,0 +1,120 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand d-flex align-items-center gap-2" [routerLink]="dashboardRoute()">
+      <img src="daltime-logo.png" alt="DalTime" height="32" />
+      DalTime
+    </a>
+
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#mainNav"
+      aria-controls="mainNav"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+    >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        @if (role() === 'WebAdmin') {
+          <li class="nav-item">
+            <a
+              class="nav-link"
+              routerLink="/web-admin"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: true }"
+              >Dashboard</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/web-admin/organizations" routerLinkActive="active"
+              >Organizations</a
+            >
+          </li>
+        }
+
+        @if (role() === 'OrgAdmin') {
+          <li class="nav-item">
+            <a
+              class="nav-link"
+              routerLink="/org-admin"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: true }"
+              >Dashboard</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/org-admin/managers" routerLinkActive="active"
+              >Managers</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/org-admin/employees" routerLinkActive="active"
+              >Employees</a
+            >
+          </li>
+        }
+
+        @if (role() === 'Manager') {
+          <li class="nav-item">
+            <a
+              class="nav-link"
+              routerLink="/manager"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: true }"
+              >Dashboard</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/manager/employees" routerLinkActive="active"
+              >Employees</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/manager/shifts-needed" routerLinkActive="active"
+              >Shifts Needed</a
+            >
+          </li>
+        }
+
+        @if (role() === 'Employee') {
+          <li class="nav-item">
+            <a
+              class="nav-link"
+              routerLink="/employee"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: true }"
+              >Dashboard</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/employee/availability" routerLinkActive="active"
+              >Availability</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" routerLink="/employee/swap-shifts" routerLinkActive="active"
+              >Swap Shifts</a
+            >
+          </li>
+        }
+      </ul>
+
+      <ul class="navbar-nav align-items-center gap-2">
+        @if (role()) {
+          <li class="nav-item">
+            <a class="nav-link" [routerLink]="profileRoute()" routerLinkActive="active">Profile</a>
+          </li>
+        }
+        <li class="nav-item">
+          <button class="btn btn-outline-dark btn-sm" (click)="authService.logout()">
+            Sign Out
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>

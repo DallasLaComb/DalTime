@@ -1,0 +1,30 @@
+{
+  "name": "daltime-backend",
+  "version": "1.0.0",
+  "description": "DalTime scheduling application backend - AWS Lambda functions",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "PATH=\"$PATH:$(pwd)/node_modules/.bin\" sam build",
+    "start": "PATH=\"$PATH:$(pwd)/node_modules/.bin\" sam local start-api --template template.yaml --port 3000",
+    "deploy": "sam deploy --guided"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "sam",
+    "serverless"
+  ],
+  "author": "Dallas LaComb",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.995.0",
+    "@aws-sdk/lib-dynamodb": "^3.995.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.160",
+    "@types/node": "^25.3.0",
+    "esbuild": "^0.27.3",
+    "typescript": "^5.9.3"
+  }
+}

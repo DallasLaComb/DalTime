@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: DalTime Scheduling Application Backend
+
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Default: "http://localhost:4200"
+    Description: "Frontend origin for CORS (e.g. https://daltime.example.com)"
+  LambdaArchitecture:
+    Type: String
+    Default: arm64
+    AllowedValues:
+      - arm64
+      - x86_64
+    Description: "Lambda CPU architecture (use x86_64 for local dev on x86 machines)"
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs24.x
+    Architectures:
+      - !Ref LambdaArchitecture
+    Environment:
+      Variables:
+        NODE_ENV: development
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
+
+Resources:
+
+  # ------------------------------------------------------------------ #
+  # CloudWatch — Log groups with 1-day retention                        #
+  # ------------------------------------------------------------------ #
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}/access-logs"
+      RetentionInDays: 1
+
+  OrganizationsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
+      RetentionInDays: 1
+
+  # ------------------------------------------------------------------ #
+  # HTTP API — JWT authorizer, CORS, and access logging                 #
+  # ------------------------------------------------------------------ #
+  DalTimeHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: >-
+          {"requestId":"$context.requestId","ip":"$context.identity.sourceIp",
+          "method":"$context.httpMethod","path":"$context.path",
+          "status":"$context.status","protocol":"$context.protocol",
+          "responseLength":"$context.responseLength",
+          "integrationError":"$context.integrationErrorMessage",
+          "error":"$context.error.message",
+          "integrationStatus":"$context.integration.integrationStatus"}
+      Auth:
+        DefaultAuthorizer: CognitoJwtAuthorizer
+        Authorizers:
+          CognitoJwtAuthorizer:
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/us-east-1_LVp3uUQ5l"
+              audience:
+                - "1vvrr1dvepebrkl1v246pbijju"
+            IdentitySource: "$request.header.Authorization"
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowHeaders:
+          - "Content-Type"
+          - "Authorization"
+        AllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "OPTIONS"
+        MaxAge: 300
+
+  # ------------------------------------------------------------------ #
+  # DynamoDB — Single table for all entities                            #
+  # PAY_PER_REQUEST billing — no capacity planning needed at this stage #
+  # ------------------------------------------------------------------ #
+  DalTimeTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "daltime-${AWS::StackName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # ------------------------------------------------------------------ #
+  # Lambda — Organizations CRUD (single function, 5 routes)            #
+  # ------------------------------------------------------------------ #
+  OrganizationsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrganizationsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-OrganizationsFunction"
+      LoggingConfig:
+        LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
+      CodeUri: .
+      Handler: src/functions/web-admin/organizations/main.handler
+      Events:
+        ListOrganizations:
+          Type: HttpApi
+          Properties:
+            Path: /organizations
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        CreateOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /organizations
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        GetOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /organizations/{orgId}
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        UpdateOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /organizations/{orgId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        DeleteOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /organizations/{orgId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        # CORS preflight — SAM Local does not honour CorsConfiguration,
+        # so OPTIONS must be routed to the Lambda explicitly.
+        OptionsOrganizations:
+          Type: HttpApi
+          Properties:
+            Path: /organizations
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsOrganizationById:
+          Type: HttpApi
+          Properties:
+            Path: /organizations/{orgId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DalTimeTable
+          DYNAMODB_ENDPOINT: ""
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/organizations/main.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: "es2022"
+        Minify: false
+        Sourcemap: true
+        # AWS SDK v3 is provided by the Node 24.x Lambda runtime — no need to bundle it
+        External:
+          - "@aws-sdk/*"
+
+Outputs:
+  ApiEndpoint:
+    Description: "HTTP API base URL"
+    Value: !Sub "https://${DalTimeHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  OrganizationsEndpoint:
+    Description: "Organizations CRUD endpoint"
+    Value: !Sub "https://${DalTimeHttpApi}.execute-api.${AWS::Region}.amazonaws.com/organizations"
+  OrganizationsFunction:
+    Description: "Organizations Lambda Function ARN"
+    Value: !GetAtt OrganizationsFunction.Arn
+  DalTimeTable:
+    Description: "DynamoDB single-table name"
+    Value: !Ref DalTimeTable
