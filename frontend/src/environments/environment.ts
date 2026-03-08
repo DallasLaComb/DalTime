@@ -1,4 +1,4 @@
-// Environment configuration - values injected at build time
+// Base environment configuration (also used as dev default in CI)
 export const environment = {
   name: 'dev',
   production: false,
@@ -9,6 +9,6 @@ export const environment = {
     domain: '__VITE_COGNITO_DOMAIN__',
   },
   api: {
-    baseUrl: '__VITE_API_BASE_URL__',
+    baseUrl: '__API_BASE_URL__', // Replaced by pipeline with deployed API Gateway URL
   },
 };

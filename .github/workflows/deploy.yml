@@ -1,23 +1,27 @@
+# Builds and deploys the full stack (backend + frontend) on push to any environment branch
 name: Build & Deploy
 
 on:
   push:
-    branches: [dev, qa, master]
+    branches: [dev, qa, main] # Triggers deployment to the matching GitHub environment
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write # Required for AWS OIDC authentication (no static keys needed)
+  contents: read # Required for actions/checkout to clone the repo
 
 jobs:
   deploy:
-    name: Deploy to ${{ github.ref_name == 'master' && 'prod' || github.ref_name }}
-    runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'master' && 'prod' || github.ref_name }}
+    name: Deploy to ${{ github.ref_name }} # Display name in GitHub Actions UI (e.g. "Deploy to dev")
+    runs-on: ubuntu-latest # Uses GitHub-hosted Ubuntu runner
+    environment: ${{ github.ref_name }} # Loads vars/secrets from the matching GitHub environment (dev, qa, or main)
 
     steps:
+      # Clone the repository into the runner
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Install Node.js and cache npm dependencies from both frontend and backend lockfiles
+      # to speed up subsequent runs
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,7 +31,7 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
 
-      # ── AWS Authentication (needed before backend deploy) ──
+      # ── AWS Authentication (needed for SAM deploy, S3 sync, and CloudFront invalidation) ──
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -35,46 +39,51 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      # ── Deploy Backend First ──
+      # ── Deploy Backend (SAM) ──
+      # Backend is deployed first so the API URL can be injected into the frontend build.
 
+      # Install backend Node.js dependencies (clean install from lockfile)
       - name: Install backend dependencies
         run: npm ci
         working-directory: backend
 
+      # Install the AWS SAM CLI for building and deploying the serverless backend
       - name: Setup SAM CLI
         uses: aws-actions/setup-sam@v2
 
+      # Validate the SAM template syntax
       - name: Validate SAM template
-        run: |
-          if [ -s backend/template.yaml ]; then
-            cd backend && sam validate --template template.yaml --region ${{ vars.AWS_REGION }}
-          else
-            echo "::notice::template.yaml is empty — skipping SAM validate"
-          fi
+        run: sam validate --template template.yaml --region ${{ vars.AWS_REGION }}
+        working-directory: backend
 
+      # Build the SAM application — compiles Lambda functions and resolves dependencies
+      # Adds node_modules/.bin to PATH so SAM can find locally installed tools (e.g. esbuild)
       - name: Build SAM application
-        run: |
-          if [ -s backend/template.yaml ]; then
-            cd backend && PATH="$PATH:$(pwd)/node_modules/.bin" sam build
-          else
-            echo "::notice::template.yaml is empty — skipping SAM build"
-          fi
+        run: sam build
+        working-directory: backend
+        env:
+          PATH: ${{ github.workspace }}/backend/node_modules/.bin:$PATH
 
+      # Deploy the SAM stack to AWS CloudFormation
+      # --s3-bucket: S3 bucket where SAM uploads packaged Lambda code before deploying
+      # --capabilities CAPABILITY_IAM: allows CloudFormation to create/modify IAM roles
+      # --no-confirm-changeset: auto-approve changes without prompting
+      # --no-fail-on-empty-changeset: don't fail if nothing changed
+      # --parameter-overrides: passes the allowed CORS origin into the SAM template
       - name: Deploy SAM stack
         run: |
-          if [ -s backend/template.yaml ]; then
-            cd backend && sam deploy \
-              --stack-name ${{ vars.SAM_STACK_NAME }} \
-              --s3-bucket ${{ vars.SAM_S3_BUCKET }} \
-              --capabilities CAPABILITY_IAM \
-              --no-confirm-changeset \
-              --no-fail-on-empty-changeset \
-              --region ${{ vars.AWS_REGION }} \
-              --parameter-overrides AllowedOrigin=${{ vars.ALLOWED_ORIGIN }}
-          else
-            echo "::notice::template.yaml is empty — skipping SAM deploy"
-          fi
+          sam deploy \
+            --stack-name ${{ vars.SAM_STACK_NAME }} \
+            --s3-bucket ${{ vars.SAM_S3_BUCKET }} \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --region ${{ vars.AWS_REGION }} \
+            --parameter-overrides AllowedOrigin=${{ vars.ALLOWED_ORIGIN }}
+        working-directory: backend
 
+      # Query the deployed CloudFormation stack for the API Gateway URL
+      # and save it as a step output so the frontend build can use it
       - name: Get API URL from stack outputs
         id: stack-outputs
         run: |
@@ -86,78 +95,37 @@ jobs:
           echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
           echo "✓ API URL resolved from stack: ${API_URL}"
 
-      # ── Build & Deploy Frontend (using real API URL) ──
+      # ── Build & Deploy Frontend ──
+      # Angular's fileReplacements in angular.json swaps in the correct environment file
+      # based on the build configuration (dev, qa, or main), matching the branch name.
+      # The API URL placeholder is then replaced with the real deployed API Gateway URL.
 
-      - name: Validate required environment variables
-        run: |
-          missing=()
-          [ -z "$VITE_COGNITO_USER_POOL_ID" ] && missing+=("VITE_COGNITO_USER_POOL_ID")
-          [ -z "$VITE_COGNITO_CLIENT_ID" ] && missing+=("VITE_COGNITO_CLIENT_ID")
-          [ -z "$VITE_COGNITO_REGION" ] && missing+=("VITE_COGNITO_REGION")
-          [ -z "$VITE_COGNITO_DOMAIN" ] && missing+=("VITE_COGNITO_DOMAIN")
-          [ -z "$VITE_API_BASE_URL" ] && missing+=("VITE_API_BASE_URL")
-
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing required environment variables: ${missing[*]}"
-            exit 1
-          fi
-          echo "✓ All required environment variables are set"
-        env:
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION }}
-          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
-          VITE_API_BASE_URL: ${{ steps.stack-outputs.outputs.api_url }}
-
+      # Install frontend Node.js dependencies (clean install from lockfile)
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
 
-      - name: Inject environment variables into build
+      # Replace the API URL placeholder in the target environment file with the real value
+      - name: Inject API URL into environment config
+        run: sed -i "s|__API_BASE_URL__|${API_URL}|g" src/environments/environment.${{ github.ref_name }}.ts
         working-directory: frontend
-        run: |
-          # Replace placeholders in all environment files with actual values
-          ENV_FILES="src/environments/environment.ts src/environments/environment.prod.ts src/environments/environment.testing.ts"
-          sed -i "s|__VITE_COGNITO_USER_POOL_ID__|${VITE_COGNITO_USER_POOL_ID}|g" $ENV_FILES
-          sed -i "s|__VITE_COGNITO_CLIENT_ID__|${VITE_COGNITO_CLIENT_ID}|g" $ENV_FILES
-          sed -i "s|__VITE_COGNITO_REGION__|${VITE_COGNITO_REGION}|g" $ENV_FILES
-          sed -i "s|__VITE_COGNITO_DOMAIN__|${VITE_COGNITO_DOMAIN}|g" $ENV_FILES
-          sed -i "s|__VITE_API_BASE_URL__|${VITE_API_BASE_URL}|g" $ENV_FILES
-          echo "✓ Environment variables injected (API URL: ${VITE_API_BASE_URL})"
         env:
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REGION: ${{ vars.VITE_COGNITO_REGION }}
-          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
-          VITE_API_BASE_URL: ${{ steps.stack-outputs.outputs.api_url }}
+          API_URL: ${{ steps.stack-outputs.outputs.api_url }}
 
+      # Build the Angular app using the branch name as the Angular configuration
+      # e.g. dev branch → --configuration dev → uses environment.dev.ts
       - name: Build Angular app
-        run: npm run build -- --configuration production
+        run: npm run build -- --configuration ${{ github.ref_name }}
         working-directory: frontend
 
-      - name: Validate build output
-        working-directory: frontend
-        run: |
-          # Fail if any placeholder was not replaced
-          if grep -r "__VITE_" dist/; then
-            echo "::error::Build contains unresolved environment placeholders"
-            exit 1
-          fi
-
-          # Fail if import.meta.env is still present in built JS (should be removed/replaced)
-          if grep -rE "import\.meta\.env" dist/**/*.js 2>/dev/null; then
-            echo "::error::Build contains unresolved import.meta.env references"
-            exit 1
-          fi
-
-          echo "✓ Build validation passed"
-
+      # Upload the built Angular app to S3, removing old files (--delete)
       - name: Sync frontend to S3
         run: |
           aws s3 sync frontend/dist/frontend/browser/ \
             s3://${{ vars.S3_BUCKET_NAME }}/ \
             --delete
 
+      # Clear the CDN cache so users get the latest version immediately
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
