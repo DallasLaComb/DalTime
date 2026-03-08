@@ -36,12 +36,25 @@ DalTime is a free, open-source shift scheduling web app designed specifically fo
 
 ## User Roles
 
-| Role | Description |
-|------|-------------|
-| **Web-Admin** | Platform administrators (developers) |
-| **ORG-Admin** | Organization administrator (e.g., Meriden YMCA director) |
-| **Manager** | Shift managers who create schedules and invite employees |
-| **Employee** | Staff members who view their schedules |
+### Web-Admin
+Platform-level administrators who manage all organizations within DalTime. They have access to a full organization list and can click into any organization to view and manage it with the same capabilities as an Org-Admin.
+
+### Org-Admin
+Organization administrators (e.g., a YMCA branch director) who manage their own organization. They create manager accounts and generate invite codes for managers to join the application. Org-Admins have full control over all managers within their organization and can click into any manager to view and manage things with the same capabilities as that Manager.
+
+### Manager
+Managers create invite codes for employees to join and oversee all employees under them. Key responsibilities include:
+- Defining shifts that need to be filled
+- Setting scheduling constraints (e.g., max 8 hours/day, 40 hours/week per employee)
+- Clicking **"Create Schedule"** to auto-generate a schedule based on employee availability and shift requirements
+- Reviewing and approving the generated schedule before publishing it to employees
+
+### Employee
+Employees interact with the system to:
+- Submit their availability
+- View their published schedule
+- Post their shifts as available for others to pick up
+- Pick up open shifts from other employees
 
 ## Getting Started
 
