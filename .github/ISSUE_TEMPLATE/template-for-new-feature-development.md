@@ -34,9 +34,8 @@
 ### Backend
 
 **Unit Tests**
-- [ ] Not required
-- [ ] Required — cases:
-  - 
+-
+-
 
 **Model Integration Tests**
 - [ ] Create
@@ -60,11 +59,14 @@
 
 Location: `frontend/src/app/core/models/`
 
-- [ ] Not required
 - [ ] Model created / updated: ___
   - [ ] Parses API response correctly
-  - [ ] Optional fields handled
+  - [ ] Optional fields handled 
   - [ ] Default values set
+
+**Unit Tests**
+-
+-
 
 **Frontend Logic Tests**
 - [ ] Service logic tested
@@ -75,7 +77,6 @@ Location: `frontend/src/app/core/models/`
 
 ### E2E Tests
 
-- [ ] Not required
 - [ ] Required — workflow:
   - [ ] Signup / login
   - [ ] Create flow
