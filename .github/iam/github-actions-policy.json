@@ -70,11 +70,7 @@
         "apigateway:PATCH",
         "apigateway:DELETE"
       ],
-      "Resource": [
-        "arn:aws:apigateway:*::/apis",
-        "arn:aws:apigateway:*::/apis/*",
-        "arn:aws:apigateway:*::/tags/*"
-      ]
+      "Resource": "arn:aws:apigateway:*::/*"
     },
     {
       "Sid": "DynamoDBTableManagement",
