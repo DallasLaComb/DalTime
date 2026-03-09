@@ -1,0 +1,263 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: Build SAM",
+      "type": "shell",
+      "command": "sam build",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Backend: Start Local API",
+      "type": "shell",
+      "command": "sam local start-api --port 3000 --env-vars local/env.json",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^.*$",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Mounting.*$",
+          "endsPattern": "^.*Running on http://127.0.0.1:3000.*$"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "dependsOn": ["Backend: Build SAM"]
+    },
+    {
+      "label": "Backend: Invoke Test Function",
+      "type": "shell",
+      "command": "sam local invoke TestFunction --no-event",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Backend: Validate SAM Template",
+      "type": "shell",
+      "command": "sam validate --template template.yaml",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Backend: Deploy to AWS",
+      "type": "shell",
+      "command": "sam deploy --guided",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Backend: Install Dependencies",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Frontend: Install Dependencies",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Frontend: Start Dev Server",
+      "type": "shell",
+      "command": "npm start",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^.*$",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Initial chunk files",
+          "endsPattern": "Compiled successfully"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      }
+    },
+    {
+      "label": "Install All Dependencies",
+      "dependsOn": [
+        "Backend: Install Dependencies",
+        "Frontend: Install Dependencies"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "DynamoDB Local: Start",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": {
+        "cwd": "${workspaceFolder}/backend/local"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "dependsOn": ["Docker: Ensure Running"]
+    },
+    {
+      "label": "DynamoDB Local: Create Tables",
+      "type": "shell",
+      "command": "bash local/create-tables.sh",
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "dependsOn": ["DynamoDB Local: Start"]
+    },
+    {
+      "label": "DynamoDB Local: Stop",
+      "type": "shell",
+      "command": "docker compose down",
+      "options": {
+        "cwd": "${workspaceFolder}/backend/local"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Start Full Stack (with install)",
+      "dependsOn": [
+        "Install All Dependencies",
+        "DynamoDB Local: Create Tables",
+        "Backend: Start Local API",
+        "Frontend: Start Dev Server"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Start Full Stack",
+      "dependsOn": [
+        "DynamoDB Local: Create Tables",
+        "Backend: Start Local API",
+        "Frontend: Start Dev Server"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Docker: Ensure Running",
+      "type": "shell",
+      "command": "try { docker info 2>$null | Out-Null; Write-Host 'Docker is already running.' } catch { Write-Host 'Starting Docker Desktop...'; Start-Process \"$env:ProgramFiles\\Docker\\Docker\\Docker Desktop.exe\"; do { Start-Sleep 2 } while (-not (docker info 2>$null)); Write-Host 'Docker is ready.' }",
+      "options": {
+        "shell": {
+          "executable": "powershell",
+          "args": ["-NoProfile", "-Command"]
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Docker: List SAM Images",
+      "type": "shell",
+      "command": "docker images | findstr /R \"REPOSITORY lambda/nodejs\" || echo No Lambda images found",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    }
+  ]
+}

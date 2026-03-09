@@ -1,0 +1,119 @@
+# Runs unit and integration tests for both frontend and backend.
+# This is the first stage of the pipeline: push → CI → Deploy → E2E.
+# On PRs, CI gates the merge. On push to environment branches, a successful
+# CI run triggers the Build & Deploy workflow via workflow_run.
+name: CI
+
+on:
+  push:
+    branches: [dev, qa, main] # Triggers CI on direct pushes to environment branches
+  pull_request:
+    branches: [dev, qa, main] # Triggers CI on PRs targeting environment branches (gates merge)
+
+permissions:
+  contents: read # Only needs read access — no deployments or writes happen here
+
+# Frontend and backend jobs run in parallel for faster feedback.
+# Both must pass for the workflow to succeed and trigger deployment.
+jobs:
+  # ── Frontend Tests ──
+  # Runs Angular unit tests via Vitest (configured in angular.json with @angular/build:unit-test)
+  frontend:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # Clone the repository into the runner
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Install Node.js and cache npm dependencies to speed up subsequent runs
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Clean install from lockfile — ensures reproducible builds
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      # Runs `ng test` which executes Vitest against all *.spec.ts files
+      - name: Run unit tests
+        run: npm test
+        working-directory: frontend
+
+      # Build the Angular app using the target branch configuration.
+      # The API URL is hardcoded in each environment file (e.g. environment.dev.ts),
+      # so the build is complete and deployable. CD will verify the URL still matches
+      # the live stack before deploying.
+      - name: Build Angular app
+        run: npm run build -- --configuration ${{ github.base_ref || github.ref_name }}
+        working-directory: frontend
+
+      # Upload the compiled Angular app so CD can deploy the exact build that passed tests
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/frontend/browser/
+          retention-days: 3
+
+  # ── Backend Tests ──
+  # Runs unit and integration tests for the Lambda-based backend.
+  # Unit tests validate individual handler logic; integration tests verify
+  # interactions between handlers and AWS services (e.g. DynamoDB).
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # Clone the repository into the runner
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Install Node.js and cache npm dependencies to speed up subsequent runs
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # Clean install from lockfile — ensures reproducible builds
+      - name: Install dependencies
+        run: npm ci
+        working-directory: backend
+
+      # Runs tests from backend/test/unit/ — fast, no external dependencies
+      - name: Run unit tests
+        run: npm test
+        working-directory: backend
+
+      # Runs tests from backend/test/integration/ — may use mocked or local AWS services
+      - name: Run integration tests
+        run: npm run test:integration
+        working-directory: backend
+
+      # Install the AWS SAM CLI for building the serverless backend
+      - name: Setup SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      # Build the SAM application — compiles Lambda functions and resolves dependencies.
+      # Adds node_modules/.bin to PATH so SAM can find locally installed tools (e.g. esbuild).
+      - name: Build SAM application
+        run: sam build
+        working-directory: backend
+        env:
+          PATH: ${{ github.workspace }}/backend/node_modules/.bin:$PATH
+
+      # Upload the SAM build output so CD can deploy the exact build that passed tests,
+      # rather than rebuilding from source. This guarantees what was tested = what gets deployed.
+      - name: Upload SAM build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sam-build
+          path: backend/.aws-sam/build/
+          retention-days: 3

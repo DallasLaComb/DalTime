@@ -1,11 +1,3 @@
----
-name: New Feature Development
-about: Template for planning and tracking new feature development
-title: ''
-labels: ''
-assignees: ''
----
-
 ## Data Model & Access Patterns
 
 **Entity affected:**
@@ -42,9 +34,8 @@ assignees: ''
 ### Backend
 
 **Unit Tests**
-- [ ] Not required
-- [ ] Required — cases:
-  - 
+-
+-
 
 **Model Integration Tests**
 - [ ] Create
@@ -68,11 +59,15 @@ assignees: ''
 
 Location: `frontend/src/app/core/models/`
 
-- [ ] Not required
 - [ ] Model created / updated: ___
   - [ ] Parses API response correctly
-  - [ ] Optional fields handled
+  - [ ] Optional fields handled 
   - [ ] Default values set
+
+**Unit Tests**
+- [ ] Test imports `APP_TEST_PROVIDERS` from `src/test-setup.ts` for mock auth/router
+-
+-
 
 **Frontend Logic Tests**
 - [ ] Service logic tested
@@ -83,7 +78,6 @@ Location: `frontend/src/app/core/models/`
 
 ### E2E Tests
 
-- [ ] Not required
 - [ ] Required — workflow:
   - [ ] Signup / login
   - [ ] Create flow
@@ -111,5 +105,6 @@ Location: `frontend/src/app/core/models/`
 - [ ] API changes documented
 - [ ] Model and access pattern changes documented
 - [ ] Feature manually tested
+- [ ] Responsive design verified (mobile, tablet, and desktop)
 - [ ] All lines of code are understood
 
