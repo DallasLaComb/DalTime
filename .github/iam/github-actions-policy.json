@@ -126,7 +126,7 @@
       "Sid": "CloudWatchDescribe",
       "Effect": "Allow",
       "Action": "logs:DescribeLogGroups",
-      "Resource": "arn:aws:logs:*:<ACCOUNT_ID>:log-group:*"
+      "Resource": "*"
     },
     {
       "Sid": "CloudFrontInvalidation",
