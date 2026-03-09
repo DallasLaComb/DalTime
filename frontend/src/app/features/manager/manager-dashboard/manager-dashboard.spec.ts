@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { ManagerDashboard } from './manager-dashboard';
+import { APP_TEST_PROVIDERS } from '../../../../test-setup';
 
 describe('ManagerDashboard', () => {
   let component: ManagerDashboard;
@@ -8,9 +8,9 @@ describe('ManagerDashboard', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ManagerDashboard]
-    })
-    .compileComponents();
+      imports: [ManagerDashboard],
+      providers: APP_TEST_PROVIDERS,
+    }).compileComponents();
 
     fixture = TestBed.createComponent(ManagerDashboard);
     component = fixture.componentInstance;

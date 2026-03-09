@@ -9,6 +9,6 @@ export const environment = {
     domain: 'https://us-east-1lvp3uuq5l.auth.us-east-1.amazoncognito.com',
   },
   api: {
-    baseUrl: '__API_BASE_URL__', // Replaced by pipeline with deployed API Gateway URL
+    baseUrl: 'https://mdklpuu4hf.execute-api.us-east-1.amazonaws.com',
   },
 };

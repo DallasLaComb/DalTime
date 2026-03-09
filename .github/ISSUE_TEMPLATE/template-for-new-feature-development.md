@@ -65,6 +65,7 @@ Location: `frontend/src/app/core/models/`
   - [ ] Default values set
 
 **Unit Tests**
+- [ ] Test imports `APP_TEST_PROVIDERS` from `src/test-setup.ts` for mock auth/router
 -
 -
 
