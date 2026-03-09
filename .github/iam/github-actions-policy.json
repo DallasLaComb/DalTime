@@ -55,7 +55,8 @@
         "lambda:TagResource",
         "lambda:UntagResource",
         "lambda:AddPermission",
-        "lambda:RemovePermission"
+        "lambda:RemovePermission",
+        "lambda:GetPolicy"
       ],
       "Resource": "arn:aws:lambda:*:<ACCOUNT_ID>:function:daltime-*"
     },
@@ -71,7 +72,8 @@
       ],
       "Resource": [
         "arn:aws:apigateway:*::/apis",
-        "arn:aws:apigateway:*::/apis/*"
+        "arn:aws:apigateway:*::/apis/*",
+        "arn:aws:apigateway:*::/tags/*"
       ]
     },
     {
@@ -118,12 +120,17 @@
         "logs:CreateLogGroup",
         "logs:DeleteLogGroup",
         "logs:PutRetentionPolicy",
-        "logs:DescribeLogGroups",
         "logs:TagResource",
         "logs:UntagResource",
         "logs:ListTagsForResource"
       ],
       "Resource": "arn:aws:logs:*:<ACCOUNT_ID>:log-group:/aws/*/daltime-*"
+    },
+    {
+      "Sid": "CloudWatchDescribe",
+      "Effect": "Allow",
+      "Action": "logs:DescribeLogGroups",
+      "Resource": "arn:aws:logs:*:<ACCOUNT_ID>:log-group:*"
     },
     {
       "Sid": "CloudFrontInvalidation",
