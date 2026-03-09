@@ -127,6 +127,20 @@
       "Resource": "*"
     },
     {
+      "Sid": "CloudWatchLogDelivery",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogDelivery",
+        "logs:DeleteLogDelivery",
+        "logs:GetLogDelivery",
+        "logs:UpdateLogDelivery",
+        "logs:ListLogDeliveries",
+        "logs:PutResourcePolicy",
+        "logs:DescribeResourcePolicies"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "CloudFrontInvalidation",
       "Effect": "Allow",
       "Action": [
