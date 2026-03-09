@@ -63,14 +63,12 @@
     {
       "Sid": "ApiGatewayManagement",
       "Effect": "Allow",
-      "Action": [
-        "apigateway:GET",
-        "apigateway:POST",
-        "apigateway:PUT",
-        "apigateway:PATCH",
-        "apigateway:DELETE"
-      ],
-      "Resource": "arn:aws:apigateway:*::/*"
+      "Action": "apigateway:*",
+      "Resource": [
+        "arn:aws:apigateway:*::/apis",
+        "arn:aws:apigateway:*::/apis/*",
+        "arn:aws:apigateway:*::/tags/*"
+      ]
     },
     {
       "Sid": "DynamoDBTableManagement",
