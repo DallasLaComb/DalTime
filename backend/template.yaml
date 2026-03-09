@@ -7,6 +7,14 @@ Parameters:
     Type: String
     Default: "http://localhost:4200"
     Description: "Frontend origin for CORS (e.g. https://daltime.example.com)"
+  CognitoUserPoolId:
+    Type: String
+    Default: "us-east-1_LVp3uUQ5l"
+    Description: "Cognito User Pool ID for JWT validation"
+  CognitoClientId:
+    Type: String
+    Default: "1vvrr1dvepebrkl1v246pbijju"
+    Description: "Cognito App Client ID for JWT audience validation"
   LambdaArchitecture:
     Type: String
     Default: arm64
@@ -65,9 +73,9 @@ Resources:
         Authorizers:
           CognitoJwtAuthorizer:
             JwtConfiguration:
-              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/us-east-1_LVp3uUQ5l"
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolId}"
               audience:
-                - "1vvrr1dvepebrkl1v246pbijju"
+                - !Ref CognitoClientId
             IdentitySource: "$request.header.Authorization"
       CorsConfiguration:
         AllowOrigins:

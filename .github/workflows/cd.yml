@@ -58,12 +58,24 @@ jobs:
       - name: Setup SAM CLI
         uses: aws-actions/setup-sam@v2
 
+      # Extract Cognito config from the frontend environment file so the backend
+      # JWT authorizer uses the same user pool — single source of truth.
+      - name: Read Cognito config from environment file
+        id: cognito
+        run: |
+          ENV_FILE="frontend/src/environments/environment.${{ github.event.workflow_run.head_branch }}.ts"
+          USER_POOL_ID=$(grep -oP "userPoolId:\s*'\K[^']+" "${ENV_FILE}")
+          CLIENT_ID=$(grep -oP "clientId:\s*'\K[^']+" "${ENV_FILE}")
+          echo "user_pool_id=${USER_POOL_ID}" >> "$GITHUB_OUTPUT"
+          echo "client_id=${CLIENT_ID}" >> "$GITHUB_OUTPUT"
+          echo "✓ Cognito config: poolId=${USER_POOL_ID}, clientId=${CLIENT_ID}"
+
       # Deploy the SAM stack to AWS CloudFormation
       # --s3-bucket: S3 bucket where SAM uploads packaged Lambda code before deploying
       # --capabilities CAPABILITY_IAM: allows CloudFormation to create/modify IAM roles
       # --no-confirm-changeset: auto-approve changes without prompting
       # --no-fail-on-empty-changeset: don't fail if nothing changed
-      # --parameter-overrides: passes the allowed CORS origin into the SAM template
+      # --parameter-overrides: passes CORS origin and Cognito config into the SAM template
       - name: Deploy SAM stack
         run: |
           sam deploy \
@@ -73,7 +85,10 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --region ${{ vars.AWS_REGION }} \
-            --parameter-overrides AllowedOrigin=${{ vars.ALLOWED_ORIGIN }}
+            --parameter-overrides \
+              AllowedOrigin=${{ vars.ALLOWED_ORIGIN }} \
+              CognitoUserPoolId=${{ steps.cognito.outputs.user_pool_id }} \
+              CognitoClientId=${{ steps.cognito.outputs.client_id }}
         working-directory: backend
 
       # Query the deployed CloudFormation stack for the API Gateway URL

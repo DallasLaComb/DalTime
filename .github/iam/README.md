@@ -68,6 +68,8 @@ Add the following variables and secrets:
 | `S3_BUCKET_NAME` | Variable | S3 bucket hosting the frontend |
 | `CLOUDFRONT_DISTRIBUTION_ID` | Variable | CloudFront distribution ID |
 
+Cognito values (`userPoolId`, `clientId`) are read directly from `frontend/src/environments/environment.<branch>.ts` during deploy — no GitHub variables needed.
+
 ## Inline Policy
 
 The file `github-actions-policy.json` contains the scoped IAM policy attached to each role. Replace `<ACCOUNT_ID>` with the target AWS account ID before applying.
