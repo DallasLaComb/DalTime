@@ -26,3 +26,4 @@ Rules for the body:
 - If the diff contains multiple logical changes, summarize each clearly
 
 4. Output ONLY the commit message text. No explanations, no markdown fences, no commentary.
+.
