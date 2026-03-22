@@ -45,12 +45,12 @@ jobs:
         run: npm test
         working-directory: frontend
 
-      # Build the Angular app using the target branch configuration.
-      # The API URL is hardcoded in each environment file (e.g. environment.dev.ts),
-      # so the build is complete and deployable. CD will verify the URL still matches
-      # the live stack before deploying.
+      # Build the Angular app with the base environment (with placeholders).
+      # This creates a single build artifact that will be deployed to all environments.
+      # CD will replace placeholders (e.g. __API_BASE_URL__, __VITE_COGNITO_*) with values
+      # from GitHub Actions variables specific to each environment.
       - name: Build Angular app
-        run: npm run build -- --configuration ${{ github.base_ref || github.ref_name }}
+        run: npm run build
         working-directory: frontend
 
       # Upload the compiled Angular app so CD can deploy the exact build that passed tests

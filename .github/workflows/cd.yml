@@ -15,6 +15,8 @@ permissions:
   id-token: write # Required for AWS OIDC authentication (no static keys needed)
   contents: read # Required for actions/checkout to clone the repo
   actions: read # Required to download artifacts from the triggering CI run
+  deployments: write # Required to create deployment records for rulesets
+  statuses: write # Required to create deployment status for rulesets
 
 jobs:
   deploy:
@@ -118,24 +120,31 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
-      # Verify the API URL hardcoded in the environment file matches the deployed stack.
-      # If the stack URL has changed (e.g. API Gateway was recreated), this fails the deploy
-      # so you can update the environment file in source — keeping everything traceable.
-      - name: Verify API URL matches stack
+      # Replace environment placeholders in built artifacts with GitHub Actions variables
+      # This injects environment-specific Cognito and API configuration into the already-tested build
+      - name: Replace environment placeholders
+        env:
+          API_BASE_URL: ${{ steps.stack-outputs.outputs.api_url }}
+          COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
+          COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
+          COGNITO_REGION: ${{ vars.COGNITO_REGION }}
+          COGNITO_DOMAIN: ${{ vars.COGNITO_DOMAIN }}
         run: |
-          EXPECTED_URL="${{ steps.stack-outputs.outputs.api_url }}"
-          ENV_FILE="src/environments/environment.${{ github.event.workflow_run.head_branch }}.ts"
-          if grep -q "${EXPECTED_URL}" "${ENV_FILE}"; then
-            echo "✓ API URL verified: ${EXPECTED_URL}"
-          else
-            ACTUAL_URL=$(grep -oP "baseUrl:\s*'\\K[^']+" "${ENV_FILE}")
-            echo "✗ API URL mismatch!"
-            echo "  Environment file: ${ACTUAL_URL}"
-            echo "  Stack output:     ${EXPECTED_URL}"
-            echo "  Update ${ENV_FILE} with the correct URL and push again."
-            exit 1
-          fi
-        working-directory: frontend
+          # Find all HTML, JS, text files in the build directory and replace placeholders
+          find frontend/dist/frontend/browser \( -name "*.html" -o -name "*.js" -o -name "*.txt" \) -type f -exec sed -i \
+            -e "s|__API_BASE_URL__|${API_BASE_URL}|g" \
+            -e "s|__VITE_COGNITO_USER_POOL_ID__|${COGNITO_USER_POOL_ID}|g" \
+            -e "s|__VITE_COGNITO_CLIENT_ID__|${COGNITO_CLIENT_ID}|g" \
+            -e "s|__VITE_COGNITO_REGION__|${COGNITO_REGION}|g" \
+            -e "s|__VITE_COGNITO_DOMAIN__|${COGNITO_DOMAIN}|g" \
+            {} +
+
+          echo "✓ Placeholders replaced:"
+          echo "  API_BASE_URL: ${API_BASE_URL}"
+          echo "  COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:0:10}..."
+          echo "  COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:0:10}..."
+          echo "  COGNITO_REGION: ${COGNITO_REGION}"
+          echo "  COGNITO_DOMAIN: ${COGNITO_DOMAIN}"
 
       # Upload the built Angular app to S3, removing old files (--delete)
       - name: Sync frontend to S3
@@ -150,3 +159,28 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
+
+      # Explicitly report deployment success to GitHub so rulesets recognize it
+      # This ensures the required_deployment_environments rule sees the successful deployment
+      - name: Report deployment success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.ref,
+              environment: '${{ github.event.workflow_run.head_branch }}',
+              auto_merge: false,
+              required_contexts: []
+            });
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'success',
+              environment_url: context.server_url + '/' + context.repo.owner + '/' + context.repo.repo,
+              description: 'Deployment successful'
+            });
