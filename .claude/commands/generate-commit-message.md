@@ -27,3 +27,4 @@ Rules for the body:
 
 4. Output ONLY the commit message text. No explanations, no markdown fences, no commentary.
 .
+ 
