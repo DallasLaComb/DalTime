@@ -253,6 +253,6 @@ jobs:
               repo: context.repo.repo,
               deployment_id: deployment.data.id,
               state: 'success',
-              environment_url: context.server_url + '/' + context.repo.owner + '/' + context.repo.repo,
+              environment_url: `https://github.com/${context.repo.owner}/${context.repo.repo}`,
               description: 'Deployment successful'
             });
