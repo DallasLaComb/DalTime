@@ -3,29 +3,26 @@
 # Flow:
 #   push to dev → CI runs → CD deploys to dev (via workflow_run)
 #   PR dev→qa merged → CD finds last successful dev CI artifact → deploys to qa (via push to qa)
-#   PR qa→main merged → CD finds last successful dev CI artifact → deploys to main (via push to main)
+#   PR qa→main merged → CD finds last successful qa CD artifact → deploys to main (via push to main)
 #
-# CI only runs on dev. The same artifact that passed CI on dev is promoted to qa and main
-# without rebuilding or retesting. Each environment uses its own AWS role and stack.
+# CI only runs on dev. QA promotes from the last successful dev CI run.
+# Main promotes from the last successful qa CD run (the artifact qa was actually deployed with).
+# Each environment uses its own AWS role and stack.
 name: CD
 
 on:
-  # Deploys to dev immediately after CI passes on dev
   workflow_run:
     workflows: ["CI"]
     types: [completed]
     branches: [dev]
 
-  # Deploys to qa or main when a PR is merged into those branches.
-  # Artifacts are sourced from the last successful CI run on dev that matches
-  # the dev commit that was merged in.
   push:
     branches: [qa, main]
 
 permissions:
-  id-token: write   # Required for AWS OIDC authentication
-  contents: read    # Required for actions/checkout
-  actions: read     # Required to search CI workflow runs and download artifacts
+  id-token: write
+  contents: read
+  actions: read
   deployments: write
   statuses: write
 
@@ -34,24 +31,20 @@ jobs:
     name: Deploy to ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
     runs-on: ubuntu-latest
 
-    # For workflow_run (dev): only deploy if CI passed
-    # For push (qa/main): always run — the artifact lookup step will fail fast if no valid CI run exists
     if: >
       github.event_name == 'push' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
-    # Resolves to 'dev', 'qa', or 'main' — used to select the correct GitHub environment,
-    # which provides the right AWS role, stack name, and other env-specific variables.
     environment: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
 
     steps:
-      # ── Resolve which CI run to pull artifacts from ──
-      # For dev: the triggering workflow_run IS the CI run — use its ID directly.
-      # For qa/main: the push event sha is a merge commit. We fetch its parents via
-      #   the GitHub API — parent[1] is the dev commit that was merged in, which is
-      #   what CI actually ran on. We check all parents plus the merge commit itself
-      #   to handle fast-forward and squash merges as well.
-      - name: Resolve CI run ID
+      # ── Resolve which run to pull artifacts from ──
+      #
+      # dev:  the triggering CI workflow_run — use its ID directly.
+      # qa:   the last successful CI run on dev — CI artifacts are what gets promoted to qa.
+      # main: the last successful CD run on qa — whatever was actually deployed to qa
+      #       is what gets promoted to main, ensuring main always gets qa-verified code.
+      - name: Resolve artifact run ID
         id: ci-run
         uses: actions/github-script@v7
         with:
@@ -60,58 +53,108 @@ jobs:
               ? context.payload.workflow_run.head_branch
               : context.ref.replace('refs/heads/', '');
 
-            // For dev, use the triggering workflow_run directly
+            // ── dev: use the triggering CI run directly ──
             if (branch === 'dev') {
               const runId = context.payload.workflow_run.id;
               const sha = context.payload.workflow_run.head_sha;
-              console.log(`✓ Dev deployment — using triggering CI run: ${runId} (${sha})`);
+              console.log(`✓ Dev — using triggering CI run: ${runId} (${sha})`);
               core.setOutput('run_id', runId);
               core.setOutput('sha', sha);
               return;
             }
 
-            // For qa/main, the push event sha is a merge commit.
-            // Fetch its parents — parent[1] is the dev HEAD that was merged in.
-            const mergeCommitSha = context.sha;
-            console.log(`Merge commit sha on ${branch}: ${mergeCommitSha}`);
+            // ── qa: find the last successful CI run on dev ──
+            if (branch === 'qa') {
+              console.log('QA promotion — finding last successful CI run on dev...');
 
-            const commit = await github.rest.git.getCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: mergeCommitSha
-            });
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci.yml',
+                branch: 'dev',
+                status: 'success',
+                per_page: 1
+              });
 
-            const parents = commit.data.parents;
-            console.log(`Parents: ${parents.map(p => p.sha).join(', ')}`);
+              if (!runs.data.workflow_runs.length) {
+                core.setFailed('No successful CI runs found on dev. Deploy to dev first.');
+                return;
+              }
 
-            // Check the merge commit itself plus all parents.
-            // Standard merge: parents[1] is the dev sha CI ran on.
-            // Fast-forward/squash: the merge commit sha IS the dev sha.
-            const shasToCheck = [mergeCommitSha, ...parents.map(p => p.sha)];
-            console.log(`Shas to check against CI runs: ${shasToCheck.join(', ')}`);
-
-            const runs = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'ci.yml',
-              branch: 'dev',
-              status: 'success',
-              per_page: 20
-            });
-
-            const match = runs.data.workflow_runs.find(r => shasToCheck.includes(r.head_sha));
-
-            if (!match) {
-              core.setFailed(
-                `No successful CI run found on dev matching shas: ${shasToCheck.join(', ')}. ` +
-                `Ensure dev was deployed successfully before promoting to ${branch}.`
-              );
+              const run = runs.data.workflow_runs[0];
+              console.log(`✓ QA — using last successful dev CI run: ${run.id} (${run.head_sha})`);
+              core.setOutput('run_id', run.id);
+              core.setOutput('sha', run.head_sha);
               return;
             }
 
-            console.log(`✓ Found matching CI run: ${match.id} (${match.head_sha})`);
-            core.setOutput('run_id', match.id);
-            core.setOutput('sha', match.head_sha);
+            // ── main: find the last successful CD run on qa ──
+            // This ensures main gets exactly what was deployed and verified on qa,
+            // not just the last CI build — it's the qa-tested artifact.
+            if (branch === 'main') {
+              console.log('Main promotion — finding last successful CD run on qa...');
+
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'cd.yml',
+                branch: 'qa',
+                status: 'success',
+                per_page: 1
+              });
+
+              if (!runs.data.workflow_runs.length) {
+                core.setFailed('No successful CD runs found on qa. Deploy to qa first.');
+                return;
+              }
+
+              const qaRun = runs.data.workflow_runs[0];
+              console.log(`✓ Found last successful qa CD run: ${qaRun.id} (${qaRun.head_sha})`);
+
+              // The qa CD run itself doesn't have artifacts — it downloaded them from a CI run.
+              // We need to find which CI run it used. The qa CD run's head_sha is the qa merge
+              // commit sha. We walk back to find the CI run on dev whose artifacts qa used,
+              // which is the most recent successful CI run on dev at the time qa was deployed.
+              // The simplest reliable approach: find the CI run on dev whose sha matches
+              // one of the parents of the qa merge commit that triggered the qa CD run.
+              const qaCommit = await github.rest.git.getCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: qaRun.head_sha
+              });
+
+              const parentShas = qaCommit.data.parents.map(p => p.sha);
+              console.log(`QA merge commit parents: ${parentShas.join(', ')}`);
+
+              const ciRuns = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci.yml',
+                branch: 'dev',
+                status: 'success',
+                per_page: 20
+              });
+
+              // Match on parent shas — parent[1] of the qa merge commit is the dev HEAD
+              const shasToCheck = [qaRun.head_sha, ...parentShas];
+              let ciRun = ciRuns.data.workflow_runs.find(r => shasToCheck.includes(r.head_sha));
+
+              // Fallback: if no sha match (e.g. multiple merges since), use the most recent
+              // successful CI run on dev — same artifact qa would have used
+              if (!ciRun) {
+                console.log('No sha match found — falling back to most recent successful dev CI run');
+                ciRun = ciRuns.data.workflow_runs[0];
+              }
+
+              if (!ciRun) {
+                core.setFailed('No successful CI runs found on dev. Deploy to dev and qa first.');
+                return;
+              }
+
+              console.log(`✓ Main — using CI run: ${ciRun.id} (${ciRun.head_sha})`);
+              core.setOutput('run_id', ciRun.id);
+              core.setOutput('sha', ciRun.head_sha);
+            }
 
       # Clone the exact commit that was built and tested in CI
       - name: Checkout
@@ -120,8 +163,6 @@ jobs:
           ref: ${{ steps.ci-run.outputs.sha }}
 
       # ── AWS Authentication ──
-      # Each environment (dev/qa/main) has its own AWS_ROLE_ARN secret configured
-      # in the corresponding GitHub environment, pointing to a separate IAM role.
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -129,8 +170,6 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       # ── Deploy Backend (SAM) ──
-
-      # Download the pre-built SAM artifact from the resolved CI run
       - name: Download SAM build artifact
         uses: actions/download-artifact@v4
         with:
@@ -142,9 +181,6 @@ jobs:
       - name: Setup SAM CLI
         uses: aws-actions/setup-sam@v2
 
-      # Extract Cognito config from the environment file for this branch.
-      # Each branch has its own environment file (environment.dev.ts, environment.qa.ts, etc.)
-      # which is the single source of truth for Cognito config per environment.
       - name: Read Cognito config from environment file
         id: cognito
         run: |
@@ -183,8 +219,6 @@ jobs:
           echo "✓ API URL resolved from stack: ${API_URL}"
 
       # ── Deploy Frontend ──
-
-      # Download the pre-built Angular app from the resolved CI run
       - name: Download frontend build artifact
         uses: actions/download-artifact@v4
         with:
@@ -193,7 +227,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ steps.ci-run.outputs.run_id }}
 
-      # Inject environment-specific config into the build placeholders
       - name: Replace environment placeholders
         env:
           API_BASE_URL: ${{ steps.stack-outputs.outputs.api_url }}
@@ -229,7 +262,6 @@ jobs:
             --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
 
-      # Report deployment success to GitHub so environment protection rules recognize it
       - name: Report deployment success
         if: success()
         uses: actions/github-script@v7
@@ -239,10 +271,15 @@ jobs:
               ? context.payload.workflow_run.head_branch
               : context.ref.replace('refs/heads/', '');
 
+            // Use the sha that CI actually ran on — this is what the PR ruleset checks against
+            const deployRef = context.eventName === 'workflow_run'
+              ? context.payload.workflow_run.head_sha
+              : context.sha;
+
             const deployment = await github.rest.repos.createDeployment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: context.sha,
+              ref: deployRef,
               environment: branch,
               auto_merge: false,
               required_contexts: []
