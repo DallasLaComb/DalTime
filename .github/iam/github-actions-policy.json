@@ -18,7 +18,7 @@
         "cloudformation:DeleteChangeSet",
         "cloudformation:GetTemplateSummary"
       ],
-      "Resource": "arn:aws:cloudformation:*:<ACCOUNT_ID>:stack/daltime-*/*"
+      "Resource": "arn:aws:cloudformation:*:737780202102:stack/daltime-*/*"
     },
     {
       "Sid": "CloudFormationTransform",
@@ -57,7 +57,7 @@
         "lambda:AddPermission",
         "lambda:RemovePermission"
       ],
-      "Resource": "arn:aws:lambda:*:<ACCOUNT_ID>:function:daltime-*"
+      "Resource": "arn:aws:lambda:*:737780202102:function:daltime-*"
     },
     {
       "Sid": "ApiGatewayManagement",
@@ -67,13 +67,18 @@
         "apigateway:POST",
         "apigateway:PUT",
         "apigateway:PATCH",
-        "apigateway:DELETE",
-        "apigateway:TagResource"
+        "apigateway:DELETE"
       ],
       "Resource": [
-        "*"
+        "arn:aws:apigateway:*::/apis",
+        "arn:aws:apigateway:*::/apis/*",
+        "arn:aws:apigateway:*::/apis/*/stages",
+        "arn:aws:apigateway:*::/apis/*/stages/*",
+        "arn:aws:apigateway:*::/tags",
+        "arn:aws:apigateway:*::/tags/*"
       ]
     },
+
     {
       "Sid": "DynamoDBTableManagement",
       "Effect": "Allow",
@@ -90,7 +95,7 @@
         "dynamodb:DescribeContinuousBackups",
         "dynamodb:UpdateContinuousBackups"
       ],
-      "Resource": "arn:aws:dynamodb:*:<ACCOUNT_ID>:table/daltime-*"
+      "Resource": "arn:aws:dynamodb:*:737780202102:table/daltime-*"
     },
     {
       "Sid": "IAMRoleForLambda",
@@ -109,7 +114,7 @@
         "iam:UntagRole",
         "iam:ListRoleTags"
       ],
-      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/daltime-*"
+      "Resource": "arn:aws:iam::737780202102:role/daltime-*"
     },
     {
       "Sid": "CloudWatchLogs",
@@ -132,7 +137,7 @@
         "cloudfront:CreateInvalidation",
         "cloudfront:GetInvalidation"
       ],
-      "Resource": "arn:aws:cloudfront::<ACCOUNT_ID>:distribution/*"
+      "Resource": "arn:aws:cloudfront::737780202102:distribution/*"
     }
   ]
 }
