@@ -271,10 +271,15 @@ jobs:
               ? context.payload.workflow_run.head_branch
               : context.ref.replace('refs/heads/', '');
 
+            // Use the sha that CI actually ran on — this is what the PR ruleset checks against
+            const deployRef = context.eventName === 'workflow_run'
+              ? context.payload.workflow_run.head_sha
+              : context.sha;
+
             const deployment = await github.rest.repos.createDeployment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: context.sha,
+              ref: deployRef,
               environment: branch,
               auto_merge: false,
               required_contexts: []
