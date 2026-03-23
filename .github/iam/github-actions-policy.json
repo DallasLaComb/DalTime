@@ -118,7 +118,10 @@
         "logs:GetLogDelivery",
         "logs:UpdateLogDelivery",
         "logs:DeleteLogDelivery",
-        "logs:ListLogDeliveries"
+        "logs:ListLogDeliveries",
+        "logs:PutResourcePolicy",
+        "logs:DeleteResourcePolicy",
+        "logs:DescribeResourcePolicies"
       ],
       "Resource": "*"
     },
