@@ -9,6 +9,6 @@ export const environment = {
     domain: 'https://us-east-1lvp3uuq5l.auth.us-east-1.amazoncognito.com',
   },
   api: {
-    baseUrl: 'https://mdklpuu4hf.execute-api.us-east-1.amazonaws.com',
+    baseUrl: 'https://ddy3hzd0ef.execute-api.us-east-1.amazonaws.com',
   },
 };
