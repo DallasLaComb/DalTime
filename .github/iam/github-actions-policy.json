@@ -18,7 +18,7 @@
         "cloudformation:DeleteChangeSet",
         "cloudformation:GetTemplateSummary"
       ],
-      "Resource": "arn:aws:cloudformation:*:<ACCOUNT_ID>:stack/daltime-*/*"
+      "Resource": "arn:aws:cloudformation:*:737780202102:stack/daltime-*/*"
     },
     {
       "Sid": "CloudFormationTransform",
@@ -55,20 +55,15 @@
         "lambda:TagResource",
         "lambda:UntagResource",
         "lambda:AddPermission",
-        "lambda:RemovePermission",
-        "lambda:GetPolicy"
+        "lambda:RemovePermission"
       ],
-      "Resource": "arn:aws:lambda:*:<ACCOUNT_ID>:function:daltime-*"
+      "Resource": "arn:aws:lambda:*:737780202102:function:daltime-*"
     },
     {
       "Sid": "ApiGatewayManagement",
       "Effect": "Allow",
       "Action": "apigateway:*",
-      "Resource": [
-        "arn:aws:apigateway:*::/apis",
-        "arn:aws:apigateway:*::/apis/*",
-        "arn:aws:apigateway:*::/tags/*"
-      ]
+      "Resource": "*"
     },
     {
       "Sid": "DynamoDBTableManagement",
@@ -86,10 +81,10 @@
         "dynamodb:DescribeContinuousBackups",
         "dynamodb:UpdateContinuousBackups"
       ],
-      "Resource": "arn:aws:dynamodb:*:<ACCOUNT_ID>:table/daltime-*"
+      "Resource": "arn:aws:dynamodb:*:737780202102:table/daltime-*"
     },
     {
-      "Sid": "IAMRoleForLambda",
+      "Sid": "IAMRoleManagement",
       "Effect": "Allow",
       "Action": [
         "iam:CreateRole",
@@ -103,9 +98,10 @@
         "iam:GetRolePolicy",
         "iam:TagRole",
         "iam:UntagRole",
-        "iam:ListRoleTags"
+        "iam:ListRoleTags",
+        "iam:ListAttachedRolePolicies"
       ],
-      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/daltime-*"
+      "Resource": "arn:aws:iam::737780202102:role/daltime-*"
     },
     {
       "Sid": "CloudWatchLogs",
@@ -114,28 +110,17 @@
         "logs:CreateLogGroup",
         "logs:DeleteLogGroup",
         "logs:PutRetentionPolicy",
+        "logs:DescribeLogGroups",
         "logs:TagResource",
         "logs:UntagResource",
-        "logs:ListTagsForResource"
-      ],
-      "Resource": "arn:aws:logs:*:<ACCOUNT_ID>:log-group:/aws/*/daltime-*"
-    },
-    {
-      "Sid": "CloudWatchDescribe",
-      "Effect": "Allow",
-      "Action": "logs:DescribeLogGroups",
-      "Resource": "*"
-    },
-    {
-      "Sid": "CloudWatchLogDelivery",
-      "Effect": "Allow",
-      "Action": [
+        "logs:ListTagsForResource",
         "logs:CreateLogDelivery",
-        "logs:DeleteLogDelivery",
         "logs:GetLogDelivery",
         "logs:UpdateLogDelivery",
+        "logs:DeleteLogDelivery",
         "logs:ListLogDeliveries",
         "logs:PutResourcePolicy",
+        "logs:DeleteResourcePolicy",
         "logs:DescribeResourcePolicies"
       ],
       "Resource": "*"
@@ -147,7 +132,7 @@
         "cloudfront:CreateInvalidation",
         "cloudfront:GetInvalidation"
       ],
-      "Resource": "arn:aws:cloudfront::<ACCOUNT_ID>:distribution/*"
+      "Resource": "arn:aws:cloudfront::737780202102:distribution/*"
     }
   ]
 }

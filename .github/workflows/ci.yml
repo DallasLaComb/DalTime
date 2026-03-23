@@ -25,11 +25,11 @@ jobs:
     steps:
       # Clone the repository into the runner
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       # Install Node.js and cache npm dependencies to speed up subsequent runs
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.3.0
         with:
           node-version: 24
           cache: npm
@@ -55,7 +55,7 @@ jobs:
 
       # Upload the compiled Angular app so CD can deploy the exact build that passed tests
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-build
           path: frontend/dist/frontend/browser/
@@ -72,11 +72,11 @@ jobs:
     steps:
       # Clone the repository into the runner
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       # Install Node.js and cache npm dependencies to speed up subsequent runs
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.3.0
         with:
           node-version: 24
           cache: npm
@@ -112,7 +112,7 @@ jobs:
       # Upload the SAM build output so CD can deploy the exact build that passed tests,
       # rather than rebuilding from source. This guarantees what was tested = what gets deployed.
       - name: Upload SAM build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sam-build
           path: backend/.aws-sam/build/
