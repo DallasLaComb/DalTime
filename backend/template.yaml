@@ -6,14 +6,19 @@ Parameters:
   AllowedOrigin:
     Type: String
     Default: "http://localhost:4200"
-    Description: "Frontend origin for CORS (e.g. https://daltime.example.com)"
+    Description: "Frontend origin for CORS"
+  CognitoUserPoolId:
+    Type: String
+    Default: "us-east-1_LVp3uUQ5l"
+  CognitoClientId:
+    Type: String
+    Default: "1vvrr1dvepebrkl1v246pbijju"
   LambdaArchitecture:
     Type: String
     Default: arm64
     AllowedValues:
       - arm64
       - x86_64
-    Description: "Lambda CPU architecture (use x86_64 for local dev on x86 machines)"
 
 Globals:
   Function:
@@ -28,14 +33,43 @@ Globals:
 
 Resources:
 
-  # ------------------------------------------------------------------ #
-  # CloudWatch — Log groups with 1-day retention                        #
-  # ------------------------------------------------------------------ #
+  # Access log group for the HTTP API (API Gateway V2).
+  # API Gateway V2 does not use the account-level CloudWatch role (that's V1 only).
+  # Instead, we grant the delivery.logs service principal write access via a
+  # resource-based policy directly on the log group.
   ApiAccessLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}/access-logs"
       RetentionInDays: 1
+
+  ApiAccessLogGroupPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-apigw-access-log-policy"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowApiGatewayV2Logging",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "delivery.logs.amazonaws.com"
+              },
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": "${ApiAccessLogGroup.Arn}:*",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": "${AWS::AccountId}"
+                }
+              }
+            }
+          ]
+        }
 
   OrganizationsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -43,11 +77,9 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
       RetentionInDays: 1
 
-  # ------------------------------------------------------------------ #
-  # HTTP API — JWT authorizer, CORS, and access logging                 #
-  # ------------------------------------------------------------------ #
   DalTimeHttpApi:
     Type: AWS::Serverless::HttpApi
+    DependsOn: ApiAccessLogGroupPolicy
     Properties:
       StageName: $default
       AccessLogSettings:
@@ -65,28 +97,24 @@ Resources:
         Authorizers:
           CognitoJwtAuthorizer:
             JwtConfiguration:
-              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/us-east-1_LVp3uUQ5l"
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolId}"
               audience:
-                - "1vvrr1dvepebrkl1v246pbijju"
+                - !Ref CognitoClientId
             IdentitySource: "$request.header.Authorization"
       CorsConfiguration:
         AllowOrigins:
           - !Ref AllowedOrigin
         AllowHeaders:
-          - "Content-Type"
-          - "Authorization"
+          - Content-Type
+          - Authorization
         AllowMethods:
-          - "GET"
-          - "POST"
-          - "PUT"
-          - "DELETE"
-          - "OPTIONS"
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
         MaxAge: 300
 
-  # ------------------------------------------------------------------ #
-  # DynamoDB — Single table for all entities                            #
-  # PAY_PER_REQUEST billing — no capacity planning needed at this stage #
-  # ------------------------------------------------------------------ #
   DalTimeTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -116,9 +144,6 @@ Resources:
           Projection:
             ProjectionType: ALL
 
-  # ------------------------------------------------------------------ #
-  # Lambda — Organizations CRUD (single function, 5 routes)            #
-  # ------------------------------------------------------------------ #
   OrganizationsFunction:
     Type: AWS::Serverless::Function
     DependsOn: OrganizationsFunctionLogGroup
@@ -169,8 +194,6 @@ Resources:
             ApiId: !Ref DalTimeHttpApi
             Auth:
               Authorizer: NONE
-        # CORS preflight — SAM Local does not honour CorsConfiguration,
-        # so OPTIONS must be routed to the Lambda explicitly.
         OptionsOrganizations:
           Type: HttpApi
           Properties:
@@ -203,22 +226,16 @@ Resources:
         OutExtension:
           - .js=.mjs
         Target: "es2022"
-        Minify: false
         Sourcemap: true
-        # AWS SDK v3 is provided by the Node 24.x Lambda runtime — no need to bundle it
         External:
           - "@aws-sdk/*"
 
 Outputs:
   ApiEndpoint:
-    Description: "HTTP API base URL"
     Value: !Sub "https://${DalTimeHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
   OrganizationsEndpoint:
-    Description: "Organizations CRUD endpoint"
     Value: !Sub "https://${DalTimeHttpApi}.execute-api.${AWS::Region}.amazonaws.com/organizations"
   OrganizationsFunction:
-    Description: "Organizations Lambda Function ARN"
     Value: !GetAtt OrganizationsFunction.Arn
   DalTimeTable:
-    Description: "DynamoDB single-table name"
     Value: !Ref DalTimeTable

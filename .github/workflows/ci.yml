@@ -1,20 +1,18 @@
-# Runs unit and integration tests for both frontend and backend.
-# This is the first stage of the pipeline: push → CI → Deploy → E2E.
-# On PRs, CI gates the merge. On push to environment branches, a successful
-# CI run triggers the Build & Deploy workflow via workflow_run.
+# Runs unit and integration tests for the frontend and backend.
+# This is the first stage of the pipeline: push to dev → CI → Deploy to dev.
+# CI only runs on dev. QA and main are promoted from the last successful dev CI artifact
+# when a PR from dev→qa or qa→main is merged — no rebuild, no retest.
 name: CI
 
 on:
   push:
-    branches: [dev, qa, main] # Triggers CI on direct pushes to environment branches
-  pull_request:
-    branches: [dev, qa, main] # Triggers CI on PRs targeting environment branches (gates merge)
+    branches: [dev]
 
 permissions:
   contents: read # Only needs read access — no deployments or writes happen here
 
 # Frontend and backend jobs run in parallel for faster feedback.
-# Both must pass for the workflow to succeed and trigger deployment.
+# Both must pass for the workflow to succeed and trigger CD.
 jobs:
   # ── Frontend Tests ──
   # Runs Angular unit tests via Vitest (configured in angular.json with @angular/build:unit-test)
@@ -25,11 +23,11 @@ jobs:
     steps:
       # Clone the repository into the runner
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       # Install Node.js and cache npm dependencies to speed up subsequent runs
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.3.0
         with:
           node-version: 24
           cache: npm
@@ -45,26 +43,24 @@ jobs:
         run: npm test
         working-directory: frontend
 
-      # Build the Angular app using the target branch configuration.
-      # The API URL is hardcoded in each environment file (e.g. environment.dev.ts),
-      # so the build is complete and deployable. CD will verify the URL still matches
-      # the live stack before deploying.
+      # Build the Angular app with placeholder values for environment-specific config.
+      # CD will replace placeholders (e.g. __API_BASE_URL__, __VITE_COGNITO_*) with
+      # real values from GitHub Actions variables when deploying to each environment.
       - name: Build Angular app
-        run: npm run build -- --configuration ${{ github.base_ref || github.ref_name }}
+        run: npm run build
         working-directory: frontend
 
-      # Upload the compiled Angular app so CD can deploy the exact build that passed tests
+      # Upload the compiled Angular app so CD can deploy the exact build that passed tests.
+      # This artifact is reused for dev, qa, and main — no rebuild happens on promotion.
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: frontend/dist/frontend/browser/
-          retention-days: 3
+          retention-days: 7
 
   # ── Backend Tests ──
   # Runs unit and integration tests for the Lambda-based backend.
-  # Unit tests validate individual handler logic; integration tests verify
-  # interactions between handlers and AWS services (e.g. DynamoDB).
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
@@ -72,11 +68,11 @@ jobs:
     steps:
       # Clone the repository into the runner
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       # Install Node.js and cache npm dependencies to speed up subsequent runs
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.3.0
         with:
           node-version: 24
           cache: npm
@@ -109,11 +105,11 @@ jobs:
         env:
           PATH: ${{ github.workspace }}/backend/node_modules/.bin:$PATH
 
-      # Upload the SAM build output so CD can deploy the exact build that passed tests,
-      # rather than rebuilding from source. This guarantees what was tested = what gets deployed.
+      # Upload the SAM build output so CD can deploy the exact build that passed tests.
+      # This artifact is reused for dev, qa, and main — no rebuild happens on promotion.
       - name: Upload SAM build artifact
         uses: actions/upload-artifact@v4
         with:
           name: sam-build
           path: backend/.aws-sam/build/
-          retention-days: 3
+          retention-days: 7
