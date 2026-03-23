@@ -112,7 +112,12 @@
         "logs:DescribeLogGroups",
         "logs:TagResource",
         "logs:UntagResource",
-        "logs:ListTagsForResource"
+        "logs:ListTagsForResource",
+        "logs:CreateLogDelivery",
+        "logs:GetLogDelivery",
+        "logs:UpdateLogDelivery",
+        "logs:DeleteLogDelivery",
+        "logs:ListLogDeliveries"
       ],
       "Resource": "*"
     },
