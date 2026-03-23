@@ -59,9 +59,12 @@
       ],
       "Resource": "arn:aws:lambda:*:737780202102:function:daltime-*"
     },
-    { "Effect": "Allow",
+    {
+      "Sid": "ApiGatewayManagement",
+      "Effect": "Allow",
       "Action": "apigateway:*",
-      "Resource": "arn:aws:apigateway:*::*" },
+      "Resource": "*"
+    },
     {
       "Sid": "DynamoDBTableManagement",
       "Effect": "Allow",
