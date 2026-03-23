@@ -84,7 +84,7 @@
       "Resource": "arn:aws:dynamodb:*:737780202102:table/daltime-*"
     },
     {
-      "Sid": "IAMRoleForLambda",
+      "Sid": "IAMRoleManagement",
       "Effect": "Allow",
       "Action": [
         "iam:CreateRole",
@@ -98,7 +98,8 @@
         "iam:GetRolePolicy",
         "iam:TagRole",
         "iam:UntagRole",
-        "iam:ListRoleTags"
+        "iam:ListRoleTags",
+        "iam:ListAttachedRolePolicies"
       ],
       "Resource": "arn:aws:iam::737780202102:role/daltime-*"
     },
