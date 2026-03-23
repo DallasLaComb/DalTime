@@ -33,28 +33,30 @@ Globals:
 
 Resources:
 
-  ApiGatewayLogsResourcePolicy:
-    Type: AWS::Logs::ResourcePolicy
+  # Grants API Gateway permission to write to CloudWatch Logs at the account level.
+  # This replaces the AWS::Logs::ResourcePolicy approach, which requires
+  # logs:DescribeResourcePolicies — a permission not available to GitHub Actions OIDC roles
+  # by default. The account-level role only needs to be set once per region, but
+  # CloudFormation is idempotent so re-deploying is safe.
+  ApiGatewayCloudWatchRole:
+    Type: AWS::IAM::Role
     Properties:
-      PolicyName: ApiGatewayAccessLogsPolicy
-      PolicyDocument: |
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "AllowApiGatewayToPushLogs",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "apigateway.amazonaws.com"
-              },
-              "Action": [
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-              ],
-              "Resource": "*"
-            }
-          ]
-        }
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+  # Registers the IAM role with API Gateway at the account level so all APIs
+  # in this region can write access logs to CloudWatch.
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
 
   ApiAccessLogGroup:
     Type: AWS::Logs::LogGroup
@@ -71,7 +73,7 @@ Resources:
   DalTimeHttpApi:
     Type: AWS::Serverless::HttpApi
     DependsOn:
-      - ApiGatewayLogsResourcePolicy
+      - ApiGatewayAccount
     Properties:
       StageName: $default
       AccessLogSettings:
