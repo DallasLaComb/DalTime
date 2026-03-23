@@ -59,26 +59,9 @@
       ],
       "Resource": "arn:aws:lambda:*:737780202102:function:daltime-*"
     },
-    {
-      "Sid": "ApiGatewayManagement",
-      "Effect": "Allow",
-      "Action": [
-        "apigateway:GET",
-        "apigateway:POST",
-        "apigateway:PUT",
-        "apigateway:PATCH",
-        "apigateway:DELETE"
-      ],
-      "Resource": [
-        "arn:aws:apigateway:*::/apis",
-        "arn:aws:apigateway:*::/apis/*",
-        "arn:aws:apigateway:*::/apis/*/stages",
-        "arn:aws:apigateway:*::/apis/*/stages/*",
-        "arn:aws:apigateway:*::/tags",
-        "arn:aws:apigateway:*::/tags/*"
-      ]
-    },
-
+    { "Effect": "Allow",
+      "Action": "apigateway:*",
+      "Resource": "arn:aws:apigateway:*::*" },
     {
       "Sid": "DynamoDBTableManagement",
       "Effect": "Allow",
