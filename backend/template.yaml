@@ -33,36 +33,43 @@ Globals:
 
 Resources:
 
-  # Grants API Gateway permission to write to CloudWatch Logs at the account level.
-  # This replaces the AWS::Logs::ResourcePolicy approach, which requires
-  # logs:DescribeResourcePolicies — a permission not available to GitHub Actions OIDC roles
-  # by default. The account-level role only needs to be set once per region, but
-  # CloudFormation is idempotent so re-deploying is safe.
-  ApiGatewayCloudWatchRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
-
-  # Registers the IAM role with API Gateway at the account level so all APIs
-  # in this region can write access logs to CloudWatch.
-  ApiGatewayAccount:
-    Type: AWS::ApiGateway::Account
-    Properties:
-      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
-
+  # Access log group for the HTTP API (API Gateway V2).
+  # API Gateway V2 does not use the account-level CloudWatch role (that's V1 only).
+  # Instead, we grant the delivery.logs service principal write access via a
+  # resource-based policy directly on the log group.
   ApiAccessLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}/access-logs"
       RetentionInDays: 1
+
+  ApiAccessLogGroupPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-apigw-access-log-policy"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowApiGatewayV2Logging",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "delivery.logs.amazonaws.com"
+              },
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": "${ApiAccessLogGroup.Arn}:*",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": "${AWS::AccountId}"
+                }
+              }
+            }
+          ]
+        }
 
   OrganizationsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -72,8 +79,7 @@ Resources:
 
   DalTimeHttpApi:
     Type: AWS::Serverless::HttpApi
-    DependsOn:
-      - ApiGatewayAccount
+    DependsOn: ApiAccessLogGroupPolicy
     Properties:
       StageName: $default
       AccessLogSettings:
