@@ -71,9 +71,7 @@
         "apigateway:TagResource"
       ],
       "Resource": [
-        "arn:aws:apigateway:*::/apis",
-        "arn:aws:apigateway:*::/apis/*",
-        "arn:aws:apigateway:*::/tags/*" 
+        "*"
       ]
     },
     {
