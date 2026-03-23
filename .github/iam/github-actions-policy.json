@@ -124,7 +124,7 @@
         "logs:UntagResource",
         "logs:ListTagsForResource"
       ],
-      "Resource": "arn:aws:logs:*:<ACCOUNT_ID>:log-group:/aws/*/daltime-*"
+      "Resource": "*"
     },
     {
       "Sid": "CloudFrontInvalidation",
