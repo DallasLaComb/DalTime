@@ -7,8 +7,6 @@ name: CI
 on:
   push:
     branches: [dev, qa, main] # Triggers CI on direct pushes to environment branches
-  pull_request:
-    branches: [dev, qa, main] # Triggers CI on PRs targeting environment branches (gates merge)
 
 permissions:
   contents: read # Only needs read access — no deployments or writes happen here
