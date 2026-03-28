@@ -9,7 +9,8 @@ on:
     branches: [dev]
 
 permissions:
-  contents: read # Only needs read access — no deployments or writes happen here
+  contents: read
+  security-events: write # Required for CodeQL to upload results to GitHub Security tab
 
 # Frontend and backend jobs run in parallel for faster feedback.
 # Both must pass for the workflow to succeed and trigger CD.
@@ -113,3 +114,28 @@ jobs:
           name: sam-build
           path: backend/.aws-sam/build/
           retention-days: 7
+
+  # ── CodeQL Security Scan ──
+  # Scans TypeScript/JavaScript for security vulnerabilities and code quality issues.
+  # Results appear in the GitHub Security tab under Code Scanning.
+  codeql:
+    name: CodeQL security scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3

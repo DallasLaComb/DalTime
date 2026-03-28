@@ -1,0 +1,442 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  DalTime Foundation Infrastructure.
+  Manages S3, CloudFront, and Cognito for a single environment.
+  Deploy once per environment via the Deploy Foundation workflow.
+  To import existing resources: see docs/cloudformation-import.md.
+
+Parameters:
+
+  Environment:
+    Type: String
+    AllowedValues: [dev, qa, prod]
+    Description: Deployment environment name
+
+  CustomDomain:
+    Type: String
+    Description: "Custom domain alias for CloudFront (e.g. dev.daltime.com)"
+
+  AcmCertificateArn:
+    Type: String
+    Description: "ACM certificate ARN — must be in us-east-1 regardless of region"
+
+  FrontendBucketName:
+    Type: String
+    Description: "S3 bucket name for frontend assets"
+
+  CognitoDomainPrefix:
+    Type: String
+    Description: "Cognito hosted UI domain prefix (e.g. daltime-dev)"
+
+  # ── Cognito auth behaviour ───────────────────────────────────────────────────
+  # These differ between dev (phone/username) and qa/prod (email).
+
+  CognitoUsernameAttributes:
+    Type: String
+    Default: ""
+    Description: "Leave empty for username-based login. Set to 'email' for email-based login."
+    AllowedValues: ["", "email"]
+
+  CognitoAdminCreateUserOnly:
+    Type: String
+    Default: "false"
+    Description: "Set to 'true' to disable self-registration (admin creates users only)."
+    AllowedValues: ["true", "false"]
+
+  CognitoAutoVerifiedAttributes:
+    Type: String
+    Default: "phone_number"
+    Description: "Attribute auto-verified on sign-up."
+    AllowedValues: ["phone_number", "email"]
+
+  # ── Cognito app client callbacks ─────────────────────────────────────────────
+
+  LocalCallbackUrl:
+    Type: String
+    Default: ""
+    Description: "Local dev callback URL (e.g. http://localhost:4200). Leave empty for qa/prod."
+
+  # ── Import overrides ─────────────────────────────────────────────────────────
+  # Leave at defaults for fresh deployments.
+  # Set to match existing resource values when importing manually-created resources.
+
+  CognitoSNSRoleName:
+    Type: String
+    Default: ""
+    Description: "IAM role name for Cognito → SNS. Override when importing an auto-created role."
+
+  CognitoSNSRolePath:
+    Type: String
+    Default: "/"
+    Description: "IAM role path. Use /service-role/ when importing a Cognito-auto-created role."
+
+  CognitoSNSExternalId:
+    Type: String
+    Default: ""
+    Description: "ExternalId in the Cognito SMS trust policy. Leave empty to disable SMS config entirely."
+
+Conditions:
+  # SMS / SNS role — only created when an ExternalId is provided
+  HasSmsConfig:      !Not [!Equals [!Ref CognitoSNSExternalId, ""]]
+  UseDefaultRoleName: !Equals [!Ref CognitoSNSRoleName, ""]
+  UseDefaultExternalId: !Equals [!Ref CognitoSNSExternalId, ""]
+
+  # Cognito auth behaviour
+  IsEmailBased:       !Equals [!Ref CognitoUsernameAttributes, "email"]
+  AdminCreateOnly:    !Equals [!Ref CognitoAdminCreateUserOnly, "true"]
+  VerifiesPhone:      !Equals [!Ref CognitoAutoVerifiedAttributes, "phone_number"]
+
+  # App client
+  HasLocalCallback:   !Not [!Equals [!Ref LocalCallbackUrl, ""]]
+
+Resources:
+
+  # ── IAM: Cognito → SNS (only created when SMS is enabled) ───────────────────
+
+  CognitoSNSRole:
+    Type: AWS::IAM::Role
+    Condition: HasSmsConfig
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RoleName: !If
+        - UseDefaultRoleName
+        - !Sub "daltime-CognitoSNS-${Environment}"
+        - !Ref CognitoSNSRoleName
+      Path: !Ref CognitoSNSRolePath
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cognito-idp.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !If
+                  - UseDefaultExternalId
+                  - !Sub "daltime-${Environment}-cognito-sns"
+                  - !Ref CognitoSNSExternalId
+      Policies:
+        - PolicyName: CognitoSNSPublish
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: "*"
+
+  # ── S3 ──────────────────────────────────────────────────────────────────────
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref FrontendBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2008-10-17'
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipal
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              ArnLike:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}"
+
+  # ── CloudFront ───────────────────────────────────────────────────────────────
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "oac-daltime-frontend-${Environment}"
+        Description: !Sub "OAC for DalTime ${Environment} frontend bucket"
+        SigningProtocol: sigv4
+        SigningBehavior: always
+        OriginAccessControlOriginType: s3
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "DalTime ${Environment} frontend"
+        Aliases:
+          - !Ref CustomDomain
+        ViewerCertificate:
+          AcmCertificateArn: !Ref AcmCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        HttpVersion: http2
+        IPV6Enabled: true
+        PriceClass: PriceClass_All
+        Origins:
+          - Id: !Sub "s3-daltime-frontend-${Environment}"
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: !Sub "s3-daltime-frontend-${Environment}"
+          ViewerProtocolPolicy: redirect-to-https
+          # AWS managed cache policy: CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          AllowedMethods:
+            - GET
+            - HEAD
+          Compress: true
+        # SPA routing: return index.html for 403/404 so Angular handles routing
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponsePagePath: /index.html
+            ResponseCode: "200"
+            ErrorCachingMinTTL: 10
+          - ErrorCode: 404
+            ResponsePagePath: /index.html
+            ResponseCode: "200"
+            ErrorCachingMinTTL: 10
+
+  # ── Cognito ──────────────────────────────────────────────────────────────────
+  #
+  # DeletionPolicy: Retain — CloudFormation will NOT delete the user pool on
+  # stack deletion. To factory-reset: manually disable DeletionProtection in
+  # the console, delete the stack, then manually delete the pool.
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub "daltime-${Environment}"
+      DeletionProtection: ACTIVE
+      UserPoolTier: ESSENTIALS
+      UsernameConfiguration:
+        CaseSensitive: false
+      UsernameAttributes: !If
+        - IsEmailBased
+        - [email]
+        - !Ref AWS::NoValue
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+        SignInPolicy:
+          AllowedFirstAuthFactors:
+            - PASSWORD
+      MfaConfiguration: "OFF"
+      Schema:
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+        - Name: phone_number
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+        - Name: org_id
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+          DeveloperOnlyAttribute: false
+        - Name: manager_id
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+          DeveloperOnlyAttribute: false
+        - Name: user_type
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+          DeveloperOnlyAttribute: false
+      AutoVerifiedAttributes:
+        - !Ref CognitoAutoVerifiedAttributes
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate: !If
+          - VerifiesPhone
+          - [phone_number]
+          - []
+      SmsConfiguration: !If
+        - HasSmsConfig
+        - SnsCallerArn: !GetAtt CognitoSNSRole.Arn
+          ExternalId: !If
+            - UseDefaultExternalId
+            - !Sub "daltime-${Environment}-cognito-sns"
+            - !Ref CognitoSNSExternalId
+          SnsRegion: !Ref AWS::Region
+        - !Ref AWS::NoValue
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: !If [AdminCreateOnly, true, false]
+        UnusedAccountValidityDays: 7
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Priority: 1
+            Name: verified_email
+          - Priority: 2
+            Name: verified_phone_number
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref UserPool
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      ClientName: !Sub "daltime-${Environment}"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      RefreshTokenValidity: 5
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_AUTH
+        - ALLOW_USER_SRP_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs: !If
+        - HasLocalCallback
+        - - !Ref LocalCallbackUrl
+          - !Sub "${LocalCallbackUrl}/sso"
+          - !Sub "https://${CustomDomain}"
+          - !Sub "https://${CustomDomain}/sso"
+        - - !Sub "https://${CustomDomain}/sso"
+      LogoutURLs: !If
+        - HasLocalCallback
+        - - !Ref LocalCallbackUrl
+          - !Sub "https://${CustomDomain}"
+        - - !Sub "https://${CustomDomain}"
+      DefaultRedirectURI: !If
+        - HasLocalCallback
+        - !Sub "https://${CustomDomain}/sso"
+        - !Ref AWS::NoValue
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - aws.cognito.signin.user.admin
+        - email
+        - openid
+        - phone
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      EnablePropagateAdditionalUserContextData: false
+      AuthSessionValidity: 3
+
+  # ── Cognito User Groups ──────────────────────────────────────────────────────
+
+  GroupWebAdmin:
+    Type: AWS::Cognito::UserPoolGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      GroupName: WebAdmin
+      UserPoolId: !Ref UserPool
+      Description: "Platform administrators with full system access for development, debugging, and technical operations across all organizations."
+      Precedence: 0
+
+  GroupOrgAdmin:
+    Type: AWS::Cognito::UserPoolGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      GroupName: OrgAdmin
+      UserPoolId: !Ref UserPool
+      Description: "Organization administrators responsible for managing users, settings, and resources within their assigned organization."
+      Precedence: 1
+
+  GroupManager:
+    Type: AWS::Cognito::UserPoolGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      GroupName: Manager
+      UserPoolId: !Ref UserPool
+      Description: "Can manage team members and approve timesheets"
+      Precedence: 2
+
+  GroupEmployee:
+    Type: AWS::Cognito::UserPoolGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      GroupName: Employee
+      UserPoolId: !Ref UserPool
+      Description: "Can view and submit own timesheets"
+      Precedence: 3
+
+Outputs:
+
+  BucketName:
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-BucketName"
+
+  DistributionId:
+    Value: !Ref FrontendDistribution
+    Export:
+      Name: !Sub "${AWS::StackName}-DistributionId"
+
+  DistributionDomainName:
+    Value: !GetAtt FrontendDistribution.DomainName
+    Export:
+      Name: !Sub "${AWS::StackName}-DistributionDomainName"
+
+  UserPoolId:
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolId"
+
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolClientId"
+
+  CognitoDomain:
+    Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+    Export:
+      Name: !Sub "${AWS::StackName}-CognitoDomain"
+
+  CognitoRegion:
+    Value: !Ref AWS::Region
+    Export:
+      Name: !Sub "${AWS::StackName}-CognitoRegion"
