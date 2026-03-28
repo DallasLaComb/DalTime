@@ -1,0 +1,64 @@
+# Deploys the foundation stack (S3, CloudFront, Cognito) to a single environment.
+#
+# Run this ONCE per environment before the first CD deploy.
+# Re-run any time you change infra/foundation.yaml.
+#
+# Required GitHub environment variables per environment:
+#   vars.AWS_REGION          — e.g. us-east-1
+#   vars.CUSTOM_DOMAIN       — e.g. dev.daltime.com
+#   vars.ACM_CERTIFICATE_ARN — ACM cert ARN in us-east-1
+#   vars.FRONTEND_BUCKET_NAME — e.g. daltime-frontend-dev
+#   vars.COGNITO_DOMAIN_PREFIX — e.g. daltime-dev
+#   secrets.AWS_ROLE_ARN     — OIDC role ARN for this environment
+name: Deploy Foundation
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        options: [dev, qa, prod]
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-foundation:
+    name: Deploy foundation to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy foundation stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/foundation.yaml \
+            --stack-name daltime-foundation-${{ inputs.environment }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --region us-east-1 \
+            --parameter-overrides \
+              Environment=${{ inputs.environment }} \
+              CustomDomain=${{ vars.CUSTOM_DOMAIN }} \
+              AcmCertificateArn=${{ vars.ACM_CERTIFICATE_ARN }} \
+              FrontendBucketName=${{ vars.FRONTEND_BUCKET_NAME }} \
+              CognitoDomainPrefix=${{ vars.COGNITO_DOMAIN_PREFIX }}
+
+      - name: Show stack outputs
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name daltime-foundation-${{ inputs.environment }} \
+            --region us-east-1 \
+            --query "Stacks[0].Outputs" \
+            --output table
