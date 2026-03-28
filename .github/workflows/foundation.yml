@@ -40,6 +40,13 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
+      - name: Scan CloudFormation template (Checkov)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          file: infra/foundation.yaml
+          framework: cloudformation
+          soft_fail: true
+
       - name: Deploy foundation stack
         run: |
           aws cloudformation deploy \
