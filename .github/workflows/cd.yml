@@ -30,6 +30,8 @@ jobs:
   deploy:
     name: Deploy to ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
     runs-on: ubuntu-latest
+    env:
+      BRANCH: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
 
     if: >
       github.event_name == 'push' ||
@@ -167,7 +169,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: us-east-1
 
       # ── Deploy Backend (SAM) ──
       - name: Download SAM build artifact
@@ -181,16 +183,25 @@ jobs:
       - name: Setup SAM CLI
         uses: aws-actions/setup-sam@v2
 
-      - name: Read Cognito config from environment file
-        id: cognito
+      - name: Get foundation stack outputs
+        id: foundation
         run: |
-          BRANCH=${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
-          ENV_FILE="frontend/src/environments/environment.${BRANCH}.ts"
-          USER_POOL_ID=$(grep -oP "userPoolId:\s*'\K[^']+" "${ENV_FILE}")
-          CLIENT_ID=$(grep -oP "clientId:\s*'\K[^']+" "${ENV_FILE}")
-          echo "user_pool_id=${USER_POOL_ID}" >> "$GITHUB_OUTPUT"
-          echo "client_id=${CLIENT_ID}" >> "$GITHUB_OUTPUT"
-          echo "✓ Cognito config: poolId=${USER_POOL_ID}, clientId=${CLIENT_ID}"
+          OUTPUTS=$(aws cloudformation describe-stacks \
+            --stack-name daltime-foundation-${BRANCH} \
+            --region us-east-1 \
+            --query "Stacks[0].Outputs" \
+            --output json)
+
+          get() { echo "$OUTPUTS" | jq -r --arg k "$1" '.[] | select(.OutputKey==$k) | .OutputValue'; }
+
+          echo "bucket_name=$(get BucketName)"             >> "$GITHUB_OUTPUT"
+          echo "distribution_id=$(get DistributionId)"     >> "$GITHUB_OUTPUT"
+          echo "user_pool_id=$(get UserPoolId)"             >> "$GITHUB_OUTPUT"
+          echo "client_id=$(get UserPoolClientId)"          >> "$GITHUB_OUTPUT"
+          echo "cognito_domain=$(get CognitoDomain)"        >> "$GITHUB_OUTPUT"
+          echo "cognito_region=$(get CognitoRegion)"        >> "$GITHUB_OUTPUT"
+
+          echo "✓ Foundation outputs resolved for daltime-foundation-${BRANCH}"
 
       - name: Deploy SAM stack
         run: |
@@ -200,11 +211,11 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --region ${{ vars.AWS_REGION }} \
+            --region us-east-1 \
             --parameter-overrides \
               AllowedOrigin=${{ vars.ALLOWED_ORIGIN }} \
-              CognitoUserPoolId=${{ steps.cognito.outputs.user_pool_id }} \
-              CognitoClientId=${{ steps.cognito.outputs.client_id }}
+              CognitoUserPoolId=${{ steps.foundation.outputs.user_pool_id }} \
+              CognitoClientId=${{ steps.foundation.outputs.client_id }}
         working-directory: backend
 
       - name: Get API URL from stack outputs
@@ -212,7 +223,7 @@ jobs:
         run: |
           API_URL=$(aws cloudformation describe-stacks \
             --stack-name ${{ vars.SAM_STACK_NAME }} \
-            --region ${{ vars.AWS_REGION }} \
+            --region us-east-1 \
             --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
             --output text)
           echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
@@ -230,10 +241,10 @@ jobs:
       - name: Replace environment placeholders
         env:
           API_BASE_URL: ${{ steps.stack-outputs.outputs.api_url }}
-          COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
-          COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
-          COGNITO_REGION: ${{ vars.COGNITO_REGION }}
-          COGNITO_DOMAIN: ${{ vars.COGNITO_DOMAIN }}
+          COGNITO_USER_POOL_ID: ${{ steps.foundation.outputs.user_pool_id }}
+          COGNITO_CLIENT_ID: ${{ steps.foundation.outputs.client_id }}
+          COGNITO_REGION: ${{ steps.foundation.outputs.cognito_region }}
+          COGNITO_DOMAIN: ${{ steps.foundation.outputs.cognito_domain }}
         run: |
           find frontend/dist/frontend/browser \( -name "*.html" -o -name "*.js" -o -name "*.txt" \) -type f -exec sed -i \
             -e "s|__API_BASE_URL__|${API_BASE_URL}|g" \
@@ -253,13 +264,13 @@ jobs:
       - name: Sync frontend to S3
         run: |
           aws s3 sync frontend/dist/frontend/browser/ \
-            s3://${{ vars.S3_BUCKET_NAME }}/ \
+            s3://${{ steps.foundation.outputs.bucket_name }}/ \
             --delete
 
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --distribution-id ${{ steps.foundation.outputs.distribution_id }} \
             --paths "/*"
 
       - name: Report deployment success
