@@ -27,30 +27,18 @@ This only needs to be done once per AWS account.
 
 ### 3. Scope the Trust Policy
 
-Edit the role's **Trust relationships** tab to restrict access to this repo and branch:
+Use `trust-policy.json` as the trust relationship, substituting values for the target environment:
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:DallasLaComb/DalTime:ref:refs/heads/<BRANCH>"
-        }
-      }
-    }
-  ]
-}
+```bash
+sed -e 's/{{ACCOUNT_ID}}/123456789012/g' \
+    -e 's/{{ENVIRONMENT}}/dev/g' \
+    trust-policy.json
 ```
 
-Replace `<ACCOUNT_ID>` with the AWS account ID and `<BRANCH>` with `dev`, `qa`, or `main`.
+| Placeholder | Example |
+|---|---|
+| `{{ACCOUNT_ID}}` | `737780202102` (dev), `792761026828` (qa), `898147176258` (main) |
+| `{{ENVIRONMENT}}` | `dev`, `qa`, or `main` |
 
 ### 4. Configure the GitHub Environment
 
@@ -72,6 +60,10 @@ Cognito values (`userPoolId`, `clientId`) are read directly from `frontend/src/e
 
 ## Inline Policy
 
-The file `github-actions-policy.json` contains the scoped IAM policy attached to each role. Replace `<ACCOUNT_ID>` with the target AWS account ID before applying.
+The file `github-actions-policy.json` contains the scoped IAM policy attached to each role. Substitute `{{ACCOUNT_ID}}` with the target AWS account ID before applying:
+
+```bash
+sed 's/{{ACCOUNT_ID}}/123456789012/g' github-actions-policy.json
+```
 
 This policy follows least-privilege principles — all resources are scoped to `daltime-*` naming patterns. If a deploy fails with an access denied error, check which API call failed and add only that action.
