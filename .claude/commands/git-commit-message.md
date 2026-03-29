@@ -5,4 +5,4 @@ Run `git diff --cached` to see what is staged, and `git log --oneline -5` to see
 3. Keeps the subject line under 72 characters
 4. Adds a body only if the change needs explanation beyond the subject line
 
-Stage the commit but do NOT push.
+Output the commit message in chat for the user to run themselves. Do NOT run git commit.
