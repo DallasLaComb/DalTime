@@ -60,7 +60,10 @@ jobs:
               CustomDomain=${{ vars.CUSTOM_DOMAIN }} \
               AcmCertificateArn=${{ vars.ACM_CERTIFICATE_ARN }} \
               FrontendBucketName=${{ vars.FRONTEND_BUCKET_NAME }} \
-              CognitoDomainPrefix=${{ vars.COGNITO_DOMAIN_PREFIX }}
+              CognitoDomainPrefix=${{ vars.COGNITO_DOMAIN_PREFIX }} \
+              CognitoUsernameAttributes=email \
+              CognitoAutoVerifiedAttributes=email \
+              CognitoAdminCreateUserOnly=true
 
       - name: Show stack outputs
         run: |
