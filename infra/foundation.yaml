@@ -295,7 +295,6 @@ Resources:
         - !Ref AWS::NoValue
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: !If [AdminCreateOnly, true, false]
-        UnusedAccountValidityDays: 7
       AccountRecoverySetting:
         RecoveryMechanisms:
           - Priority: 1
