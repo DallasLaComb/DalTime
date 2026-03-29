@@ -1,24 +1,24 @@
 # Deploys the full stack (backend + frontend) to dev, qa, and main.
 #
 # Flow:
-#   push to dev → CI runs → CD deploys to dev (via workflow_run)
-#   PR dev→qa merged → CD finds last successful dev CI artifact → deploys to qa (via push to qa)
-#   PR qa→main merged → CD finds last successful qa CD artifact → deploys to main (via push to main)
+#   push to dev → CD starts, polls until CI succeeds on that commit → deploys to dev
+#   PR dev→qa merged → CD finds last successful dev CI artifact → deploys to qa
+#   PR qa→main merged → CD finds last successful qa CD artifact → deploys to main
 #
 # CI only runs on dev. QA promotes from the last successful dev CI run.
 # Main promotes from the last successful qa CD run (the artifact qa was actually deployed with).
 # Each environment uses its own AWS role and stack.
 name: CD
-run-name: "CD — ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}"
+run-name: "CD — ${{ github.ref_name }}"
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [dev]
-
   push:
-    branches: [qa, main]
+    branches: [dev, qa, main]
+
+# Cancel any in-progress CD run for the same branch when a new push arrives.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   id-token: write
@@ -29,21 +29,17 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy to ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
+    name: Deploy to ${{ github.ref_name }}
     runs-on: ubuntu-latest
     env:
-      BRANCH: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
+      BRANCH: ${{ github.ref_name }}
 
-    if: >
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-
-    environment: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
+    environment: ${{ github.ref_name }}
 
     steps:
       # ── Resolve which run to pull artifacts from ──
       #
-      # dev:  the triggering CI workflow_run — use its ID directly.
+      # dev:  poll until CI succeeds on this exact commit, then use that run's artifacts.
       # qa:   the last successful CI run on dev — CI artifacts are what gets promoted to qa.
       # main: the last successful CD run on qa — whatever was actually deployed to qa
       #       is what gets promoted to main, ensuring main always gets qa-verified code.
@@ -52,17 +48,42 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const branch = context.eventName === 'workflow_run'
-              ? context.payload.workflow_run.head_branch
-              : context.ref.replace('refs/heads/', '');
+            const branch = context.ref.replace('refs/heads/', '');
 
-            // ── dev: use the triggering CI run directly ──
+            // ── dev: poll until CI completes on this exact commit ──
             if (branch === 'dev') {
-              const runId = context.payload.workflow_run.id;
-              const sha = context.payload.workflow_run.head_sha;
-              console.log(`✓ Dev — using triggering CI run: ${runId} (${sha})`);
-              core.setOutput('run_id', runId);
-              core.setOutput('sha', sha);
+              const sha = context.sha;
+              console.log(`Dev — waiting for CI to complete on ${sha}...`);
+
+              for (let attempt = 0; attempt < 60; attempt++) {
+                const runs = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'ci.yml',
+                  head_sha: sha,
+                  per_page: 1
+                });
+
+                if (runs.data.workflow_runs.length > 0) {
+                  const run = runs.data.workflow_runs[0];
+                  if (run.conclusion === 'success') {
+                    console.log(`✓ Dev — CI succeeded: ${run.id} (${sha})`);
+                    core.setOutput('run_id', run.id);
+                    core.setOutput('sha', sha);
+                    return;
+                  } else if (run.conclusion) {
+                    core.setFailed(`CI ended with: ${run.conclusion}`);
+                    return;
+                  }
+                  console.log(`Attempt ${attempt + 1}/60 — CI ${run.status}, waiting 10s...`);
+                } else {
+                  console.log(`Attempt ${attempt + 1}/60 — no CI run found yet, waiting 10s...`);
+                }
+
+                await new Promise(r => setTimeout(r, 10000));
+              }
+
+              core.setFailed('Timed out waiting for CI to complete (10 min)');
               return;
             }
 
@@ -279,14 +300,8 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const branch = context.eventName === 'workflow_run'
-              ? context.payload.workflow_run.head_branch
-              : context.ref.replace('refs/heads/', '');
-
-            // Use the sha that CI actually ran on — this is what the PR ruleset checks against
-            const deployRef = context.eventName === 'workflow_run'
-              ? context.payload.workflow_run.head_sha
-              : context.sha;
+            const branch = context.ref.replace('refs/heads/', '');
+            const deployRef = context.sha;
 
             const deployment = await github.rest.repos.createDeployment({
               owner: context.repo.owner,
