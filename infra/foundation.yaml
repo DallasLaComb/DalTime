@@ -9,7 +9,7 @@ Parameters:
 
   Environment:
     Type: String
-    AllowedValues: [dev, qa, prod]
+    AllowedValues: [dev, qa, main]
     Description: Deployment environment name
 
   CustomDomain:
