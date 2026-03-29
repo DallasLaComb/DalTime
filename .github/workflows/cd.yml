@@ -9,6 +9,7 @@
 # Main promotes from the last successful qa CD run (the artifact qa was actually deployed with).
 # Each environment uses its own AWS role and stack.
 name: CD
+run-name: "CD — ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}"
 
 on:
   workflow_run:
