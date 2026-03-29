@@ -46,6 +46,12 @@ jobs:
           file: infra/foundation.yaml
           framework: cloudformation
           soft_fail: true
+          # CKV_AWS_111: sns:Publish * is required for Cognito SMS (ARN is dynamic)
+          # CKV_AWS_21:  S3 versioning adds cost with no value for a static site bucket
+          # CKV_AWS_18:  S3 access logging requires a second bucket — overkill here
+          # CKV_AWS_68:  CloudFront WAF costs per-request — not appropriate for this project
+          # CKV_AWS_86:  CloudFront logging requires a second bucket — overkill here
+          skip_check: CKV_AWS_111,CKV_AWS_21,CKV_AWS_18,CKV_AWS_68,CKV_AWS_86
 
       - name: Deploy foundation stack
         run: |
