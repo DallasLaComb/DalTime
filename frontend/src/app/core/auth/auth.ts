@@ -72,7 +72,7 @@ export class AuthService {
         this.accessToken = loginResponse.accessToken;
         this.idToken = loginResponse.idToken;
 
-        const role = this.extractUserRole(loginResponse.userData);
+        const role = this.extractUserRole(loginResponse.accessToken);
         this._role$.next(role);
 
         this.getUserAttributes();
@@ -128,14 +128,23 @@ export class AuthService {
   }
 
   /**
-   * Extracts UserRole from the OIDC userData claims.
-   * Checks custom:user_type first (Cognito's custom attribute prefix), falls back to user_type.
+   * Extracts UserRole from the Cognito access token's cognito:groups claim.
+   * Groups are only present in the access token, not the ID token/userData.
+   * The first matching group (by precedence order in VALID_ROLES) is used.
    */
-  private extractUserRole(userData: Record<string, unknown> | null): UserRole | null {
-    if (!userData) return null;
-    const raw = userData['custom:user_type'] ?? userData['user_type'];
-    if (isValidRole(raw)) return raw;
-    console.warn('No valid user_type claim found in token. Got:', raw);
+  private extractUserRole(accessToken: string | null): UserRole | null {
+    if (!accessToken) return null;
+
+    try {
+      const payload = JSON.parse(atob(accessToken.split('.')[1]));
+      const groups: unknown[] = payload['cognito:groups'] ?? [];
+      const role = groups.find((g) => isValidRole(g)) as UserRole | undefined;
+      if (role) return role;
+    } catch {
+      // malformed token — fall through to warning
+    }
+
+    console.warn('No valid Cognito group found in access token.');
     return null;
   }
 

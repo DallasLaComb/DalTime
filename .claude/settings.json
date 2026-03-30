@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(gh api:*)",
-      "Bash(aws iam:*)"
+      "Bash(aws iam:*)",
+      "Bash(docker run:*)",
+      "Bash(rm -rf /Users/dallaslacomb/Documents/DalTime/backend/.aws-sam)",
+      "Bash(sam build:*)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(timeout 20 sam local start-api --port 3000 --env-vars local/env.json --warm-containers EAGER --parameter-overrides LambdaArchitecture=arm64)",
+      "Bash(echo \"mount exit: $?\")"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   }
 }
