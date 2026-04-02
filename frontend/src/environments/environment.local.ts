@@ -3,10 +3,10 @@ export const environment = {
   name: 'local',
   production: false,
   cognito: {
-    userPoolId: 'us-east-1_LVp3uUQ5l',
-    clientId: '1vvrr1dvepebrkl1v246pbijju',
+    userPoolId: 'us-east-1_kzQ806uSv',
+    clientId: '1nl13tbaqb47s8f0tfc07lc24m',
     region: 'us-east-1',
-    domain: 'https://us-east-1lvp3uuq5l.auth.us-east-1.amazoncognito.com',
+    domain: 'daltime-dev.auth.us-east-1.amazoncognito.com',
   },
   api: {
     baseUrl: 'http://localhost:3000',
