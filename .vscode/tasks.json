@@ -4,7 +4,7 @@
     {
       "label": "Backend: Build SAM",
       "type": "shell",
-      "command": "sam build",
+      "command": "sam build --build-dir /tmp/daltime-sam-build --parameter-overrides LambdaArchitecture=arm64",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -22,7 +22,7 @@
     {
       "label": "Backend: Start Local API",
       "type": "shell",
-      "command": "sam local start-api --port 3000 --env-vars local/env.json --warm-containers EAGER --parameter-overrides LambdaArchitecture=x86_64",
+      "command": "sam build --build-dir /tmp/daltime-sam-build --parameter-overrides LambdaArchitecture=arm64 && sam local start-api --port 3000 --env-vars local/env.json --warm-containers EAGER --parameter-overrides LambdaArchitecture=arm64 --template-file /tmp/daltime-sam-build/template.yaml",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -45,7 +45,7 @@
         "panel": "dedicated",
         "clear": false
       },
-      "dependsOn": ["Backend: Build SAM", "DynamoDB Local: Create Tables"]
+      "dependsOn": ["DynamoDB Local: Create Tables"]
     },
     {
       "label": "Backend: Invoke Test Function",
