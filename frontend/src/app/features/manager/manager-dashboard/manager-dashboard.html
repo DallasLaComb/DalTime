@@ -10,8 +10,7 @@
       <dd>{{ user().email }}</dd>
       <dt>Name</dt>
       <dd>{{ user().name || user().given_name + ' ' + user().family_name }}</dd>
-      <dt>User Type</dt>
-      <dd>{{ user()['custom:user_type'] }}</dd>
+
       <dt>Org ID</dt>
       <dd>{{ user()['custom:org_id'] || 'N/A' }}</dd>
       <dt>Sub</dt>
