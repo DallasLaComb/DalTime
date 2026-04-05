@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/auth/auth';
 import { ROLE_DASHBOARD_MAP } from '../../core/auth/user-role.model';
@@ -12,6 +12,7 @@ import { ROLE_DASHBOARD_MAP } from '../../core/auth/user-role.model';
 export class Navbar {
   protected readonly authService = inject(AuthService);
   protected readonly role = this.authService.roleSignal;
+  protected readonly menuOpen = signal(false);
 
   protected readonly dashboardRoute = computed(() => {
     const r = this.role();
@@ -22,4 +23,12 @@ export class Navbar {
     const r = this.role();
     return r ? `${ROLE_DASHBOARD_MAP[r]}/profile` : '/';
   });
+
+  protected toggleMenu(): void {
+    this.menuOpen.update((open) => !open);
+  }
+
+  protected closeMenu(): void {
+    this.menuOpen.set(false);
+  }
 }

@@ -8,16 +8,15 @@
     <button
       class="navbar-toggler"
       type="button"
-      data-bs-toggle="collapse"
-      data-bs-target="#mainNav"
+      [attr.aria-expanded]="menuOpen()"
       aria-controls="mainNav"
-      aria-expanded="false"
       aria-label="Toggle navigation"
+      (click)="toggleMenu()"
     >
       <span class="navbar-toggler-icon"></span>
     </button>
 
-    <div class="collapse navbar-collapse" id="mainNav">
+    <div class="collapse navbar-collapse" id="mainNav" [class.show]="menuOpen()">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         @if (role() === 'WebAdmin') {
           <li class="nav-item">
@@ -26,11 +25,12 @@
               routerLink="/web-admin"
               routerLinkActive="active"
               [routerLinkActiveOptions]="{ exact: true }"
+              (click)="closeMenu()"
               >Dashboard</a
             >
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/web-admin/organizations" routerLinkActive="active"
+            <a class="nav-link" routerLink="/web-admin/organizations" routerLinkActive="active" (click)="closeMenu()"
               >Organizations</a
             >
           </li>
@@ -43,16 +43,17 @@
               routerLink="/org-admin"
               routerLinkActive="active"
               [routerLinkActiveOptions]="{ exact: true }"
+              (click)="closeMenu()"
               >Dashboard</a
             >
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/org-admin/managers" routerLinkActive="active"
+            <a class="nav-link" routerLink="/org-admin/managers" routerLinkActive="active" (click)="closeMenu()"
               >Managers</a
             >
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/org-admin/employees" routerLinkActive="active"
+            <a class="nav-link" routerLink="/org-admin/employees" routerLinkActive="active" (click)="closeMenu()"
               >Employees</a
             >
           </li>
@@ -65,16 +66,17 @@
               routerLink="/manager"
               routerLinkActive="active"
               [routerLinkActiveOptions]="{ exact: true }"
+              (click)="closeMenu()"
               >Dashboard</a
             >
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/manager/employees" routerLinkActive="active"
+            <a class="nav-link" routerLink="/manager/employees" routerLinkActive="active" (click)="closeMenu()"
               >Employees</a
             >
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/manager/shifts-needed" routerLinkActive="active"
+            <a class="nav-link" routerLink="/manager/shifts-needed" routerLinkActive="active" (click)="closeMenu()"
               >Shifts Needed</a
             >
           </li>
@@ -87,16 +89,17 @@
               routerLink="/employee"
               routerLinkActive="active"
               [routerLinkActiveOptions]="{ exact: true }"
+              (click)="closeMenu()"
               >Dashboard</a
             >
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/employee/availability" routerLinkActive="active"
+            <a class="nav-link" routerLink="/employee/availability" routerLinkActive="active" (click)="closeMenu()"
               >Availability</a
             >
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/employee/swap-shifts" routerLinkActive="active"
+            <a class="nav-link" routerLink="/employee/swap-shifts" routerLinkActive="active" (click)="closeMenu()"
               >Swap Shifts</a
             >
           </li>
@@ -106,7 +109,7 @@
       <ul class="navbar-nav align-items-center gap-2">
         @if (role()) {
           <li class="nav-item">
-            <a class="nav-link" [routerLink]="profileRoute()" routerLinkActive="active">Profile</a>
+            <a class="nav-link" [routerLink]="profileRoute()" routerLinkActive="active" (click)="closeMenu()">Profile</a>
           </li>
         }
         <li class="nav-item">

@@ -152,7 +152,7 @@ Resources:
       LoggingConfig:
         LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
       CodeUri: .
-      Handler: src/functions/web-admin/organizations/main.handler
+      Handler: src/functions/web-admin/organizations/handler.handler
       Events:
         ListOrganizations:
           Type: HttpApi
@@ -160,40 +160,30 @@ Resources:
             Path: /organizations
             Method: GET
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         CreateOrganization:
           Type: HttpApi
           Properties:
             Path: /organizations
             Method: POST
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         GetOrganization:
           Type: HttpApi
           Properties:
             Path: /organizations/{orgId}
             Method: GET
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         UpdateOrganization:
           Type: HttpApi
           Properties:
             Path: /organizations/{orgId}
             Method: PUT
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         DeleteOrganization:
           Type: HttpApi
           Properties:
             Path: /organizations/{orgId}
             Method: DELETE
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         OptionsOrganizations:
           Type: HttpApi
           Properties:
@@ -221,7 +211,7 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         EntryPoints:
-          - src/functions/web-admin/organizations/main.ts
+          - src/functions/web-admin/organizations/handler.ts
         Format: esm
         OutExtension:
           - .js=.mjs
