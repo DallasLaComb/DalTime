@@ -152,7 +152,7 @@ Resources:
       LoggingConfig:
         LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
       CodeUri: .
-      Handler: src/functions/web-admin/organizations/main.handler
+      Handler: src/functions/web-admin/organizations/handler.handler
       Events:
         ListOrganizations:
           Type: HttpApi
@@ -221,7 +221,7 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         EntryPoints:
-          - src/functions/web-admin/organizations/main.ts
+          - src/functions/web-admin/organizations/handler.ts
         Format: esm
         OutExtension:
           - .js=.mjs
