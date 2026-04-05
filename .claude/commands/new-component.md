@@ -136,4 +136,5 @@ File: `frontend/src/app/core/guards/<guard-name>.guard.spec.ts`
 - Never use `any` — strict TypeScript throughout
 - Bootstrap 5 grid: `container`, `row`, `col-*` — responsive breakpoints `sm`, `md`, `lg`, `xl`
 - `data-testid` attribute on every button, input, table row, and status message
+- This project is **zoneless** — never use `fakeAsync`/`tick`. Use `async/await` + `await fixture.whenStable()` for async test assertions instead
 - Run `npm test` in `frontend/` after implementation to verify tests pass

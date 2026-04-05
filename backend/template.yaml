@@ -160,40 +160,30 @@ Resources:
             Path: /organizations
             Method: GET
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         CreateOrganization:
           Type: HttpApi
           Properties:
             Path: /organizations
             Method: POST
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         GetOrganization:
           Type: HttpApi
           Properties:
             Path: /organizations/{orgId}
             Method: GET
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         UpdateOrganization:
           Type: HttpApi
           Properties:
             Path: /organizations/{orgId}
             Method: PUT
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         DeleteOrganization:
           Type: HttpApi
           Properties:
             Path: /organizations/{orgId}
             Method: DELETE
             ApiId: !Ref DalTimeHttpApi
-            Auth:
-              Authorizer: NONE
         OptionsOrganizations:
           Type: HttpApi
           Properties:
