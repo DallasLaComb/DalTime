@@ -1,18 +1,23 @@
 import { EnvironmentProviders, Provider } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { OidcSecurityService } from 'angular-auth-oidc-client';
-import { of } from 'rxjs';
+import { AuthService } from './app/core/auth/auth';
 
-/**
- * Mock OidcSecurityService for unit tests — no real Cognito connections.
- */
-const mockOidcSecurityService = {
-  isAuthenticated$: of({ isAuthenticated: false }),
-  userData$: of({ userData: null }),
-  checkAuth: () => of({ isAuthenticated: false, userData: null, accessToken: '', idToken: '', errorMessage: '' }),
-  authorize: () => {},
-  logoff: () => of(undefined),
-  logoffLocal: () => {},
+const mockAuthService = {
+  isAuthenticatedSignal: () => false,
+  roleSignal: () => null,
+  authReady: () => true,
+  accessToken: null,
+  idToken: null,
+  orgId: null,
+  hasPendingChallenge: false,
+  initialize: () => {},
+  login: async () => ({ success: false }),
+  completeNewPassword: async () => ({ success: false }),
+  logout: () => {},
+  getAccessToken: () => null,
+  getUserAttributes: async () => {},
+  updateUserAttribute: async () => false,
+  routeToDashboardForRole: () => '/',
 };
 
 /**
@@ -21,5 +26,5 @@ const mockOidcSecurityService = {
  */
 export const APP_TEST_PROVIDERS: (Provider | EnvironmentProviders)[] = [
   provideRouter([]),
-  { provide: OidcSecurityService, useValue: mockOidcSecurityService },
+  { provide: AuthService, useValue: mockAuthService },
 ];

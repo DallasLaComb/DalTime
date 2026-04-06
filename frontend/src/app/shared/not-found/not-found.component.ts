@@ -39,6 +39,6 @@ export class NotFoundComponent {
   }
 
   protected login(): void {
-    this.authService.login();
+    this.router.navigate(['/login']);
   }
 }

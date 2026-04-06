@@ -15,9 +15,9 @@ export interface Organization {
   org_id: string;
   name: string;
   address: string;
-  created_at: string;    // ISO 8601
-  updated_at: string;    // ISO 8601
-  org_admin_ids: string[];
+  created_at: string;       // ISO 8601
+  updated_at: string;       // ISO 8601
+  org_admin_count: number;  // maintained atomically by the org-admins Lambda
 }
 
 /**

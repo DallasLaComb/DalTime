@@ -1,32 +1,32 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { OrganizationService } from '../../../services/organization.service';
 import type { Organization } from '../../../core/models/organization.model';
 
 @Component({
   selector: 'app-organizations',
-  imports: [FormsModule, DatePipe],
+  imports: [DatePipe],
   templateUrl: './organizations.html',
   styleUrl: './organizations.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OrganizationsComponent {
   private readonly orgService = inject(OrganizationService);
+  private readonly router = inject(Router);
 
   readonly organizations = signal<Organization[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
-  // Modal state
   readonly showModal = signal(false);
   readonly showDeleteModal = signal(false);
   readonly editingOrg = signal<Organization | null>(null);
   readonly deletingOrg = signal<Organization | null>(null);
   readonly saving = signal(false);
 
-  // Form fields
-  formName = '';
-  formAddress = '';
+  readonly formName = signal('');
+  readonly formAddress = signal('');
 
   constructor() {
     this.loadOrganizations();
@@ -50,15 +50,15 @@ export class OrganizationsComponent {
 
   openCreateModal(): void {
     this.editingOrg.set(null);
-    this.formName = '';
-    this.formAddress = '';
+    this.formName.set('');
+    this.formAddress.set('');
     this.showModal.set(true);
   }
 
   openEditModal(org: Organization): void {
     this.editingOrg.set(org);
-    this.formName = org.name;
-    this.formAddress = org.address;
+    this.formName.set(org.name);
+    this.formAddress.set(org.address);
     this.showModal.set(true);
   }
 
@@ -68,14 +68,14 @@ export class OrganizationsComponent {
   }
 
   saveOrganization(): void {
-    if (!this.formName.trim() || !this.formAddress.trim()) return;
+    if (!this.formName().trim() || !this.formAddress().trim()) return;
 
     this.saving.set(true);
     const editing = this.editingOrg();
 
     if (editing) {
       this.orgService
-        .update(editing.org_id, { name: this.formName, address: this.formAddress })
+        .update(editing.org_id, { name: this.formName(), address: this.formAddress() })
         .subscribe({
           next: () => {
             this.saving.set(false);
@@ -88,7 +88,7 @@ export class OrganizationsComponent {
           },
         });
     } else {
-      this.orgService.create({ name: this.formName, address: this.formAddress }).subscribe({
+      this.orgService.create({ name: this.formName(), address: this.formAddress() }).subscribe({
         next: () => {
           this.saving.set(false);
           this.closeModal();
@@ -100,6 +100,10 @@ export class OrganizationsComponent {
         },
       });
     }
+  }
+
+  manageAdmins(org: Organization): void {
+    this.router.navigate(['/web-admin/organizations', org.org_id, 'org-admins']);
   }
 
   openDeleteModal(org: Organization): void {

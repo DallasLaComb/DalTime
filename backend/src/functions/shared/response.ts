@@ -41,6 +41,14 @@ export function badRequest(message = 'Bad request'): APIGatewayProxyResultV2 {
   };
 }
 
+export function conflict(message = 'Conflict'): APIGatewayProxyResultV2 {
+  return {
+    statusCode: 409,
+    headers: CORS_HEADERS,
+    body: JSON.stringify({ error: message }),
+  };
+}
+
 export function notFound(message = 'Not found'): APIGatewayProxyResultV2 {
   return {
     statusCode: 404,

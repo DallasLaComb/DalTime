@@ -4,7 +4,7 @@ export interface Organization {
   address: string;
   created_at: string;
   updated_at: string;
-  org_admin_ids: string[];
+  org_admin_count: number;
 }
 
 export interface CreateOrganizationBody {

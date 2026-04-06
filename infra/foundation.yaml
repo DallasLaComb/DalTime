@@ -328,6 +328,7 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_USER_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
         - ALLOW_USER_SRP_AUTH
       SupportedIdentityProviders:
         - COGNITO
@@ -431,7 +432,7 @@ Outputs:
       Name: !Sub "${AWS::StackName}-UserPoolClientId"
 
   CognitoDomain:
-    Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+    Value: !Sub "${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
     Export:
       Name: !Sub "${AWS::StackName}-CognitoDomain"
 
