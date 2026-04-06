@@ -1,4 +1,5 @@
 import {
+  DeleteCommand,
   GetCommand,
   PutCommand,
   QueryCommand,
@@ -61,17 +62,12 @@ export async function getOrgAdminReverseLookup(
   return result.Item as { user_id: string; org_id: string; email: string; name: string };
 }
 
-/** Update the status on the primary record to DISABLED. */
-export async function disableOrgAdminUser(orgId: string, userId: string): Promise<void> {
-  await docClient.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: { PK: `ORG#${orgId}`, SK: `USER#${userId}` },
-      UpdateExpression: 'SET #status = :status',
-      ExpressionAttributeNames: { '#status': 'status' },
-      ExpressionAttributeValues: { ':status': 'DISABLED' },
-    }),
-  );
+/** Delete both the primary and reverse-lookup records. */
+export async function deleteOrgAdminUser(orgId: string, userId: string): Promise<void> {
+  await Promise.all([
+    docClient.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { PK: `ORG#${orgId}`, SK: `USER#${userId}` } })),
+    docClient.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${userId}`, SK: 'METADATA' } })),
+  ]);
 }
 
 /** Atomically increment org_admin_count on the parent org record. */

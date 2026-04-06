@@ -27,8 +27,8 @@ export class OrgAdminsComponent {
   readonly error = signal<string | null>(null);
 
   readonly showModal = signal(false);
-  readonly showDisableModal = signal(false);
-  readonly disablingAdmin = signal<OrgAdminUserResponse | null>(null);
+  readonly showDeleteModal = signal(false);
+  readonly deletingAdmin = signal<OrgAdminUserResponse | null>(null);
   readonly saving = signal(false);
   readonly modalError = signal<string | null>(null);
 
@@ -64,13 +64,11 @@ export class OrgAdminsComponent {
 
   statusLabel(status: string): string {
     if (status === 'CONFIRMED') return 'Active';
-    if (status === 'DISABLED') return 'Disabled';
     return 'Pending';
   }
 
   statusClass(status: string): string {
     if (status === 'CONFIRMED') return 'bg-success';
-    if (status === 'DISABLED') return 'bg-secondary';
     return 'bg-warning text-dark';
   }
 
@@ -122,25 +120,25 @@ export class OrgAdminsComponent {
       });
   }
 
-  openDisableModal(admin: OrgAdminUserResponse): void {
-    this.disablingAdmin.set(admin);
-    this.showDisableModal.set(true);
+  openDeleteModal(admin: OrgAdminUserResponse): void {
+    this.deletingAdmin.set(admin);
+    this.showDeleteModal.set(true);
   }
 
-  closeDisableModal(): void {
-    this.showDisableModal.set(false);
-    this.disablingAdmin.set(null);
+  closeDeleteModal(): void {
+    this.showDeleteModal.set(false);
+    this.deletingAdmin.set(null);
   }
 
-  confirmDisable(): void {
-    const admin = this.disablingAdmin();
+  confirmDelete(): void {
+    const admin = this.deletingAdmin();
     if (!admin) return;
 
     this.saving.set(true);
-    this.orgAdminsService.disable(this.orgId, admin.user_id).subscribe({
+    this.orgAdminsService.delete(this.orgId, admin.user_id).subscribe({
       next: () => {
         this.saving.set(false);
-        this.closeDisableModal();
+        this.closeDeleteModal();
         this.load();
       },
       error: () => {

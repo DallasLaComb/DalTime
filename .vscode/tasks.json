@@ -22,7 +22,7 @@
     {
       "label": "Backend: Start Local API",
       "type": "shell",
-      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 && sam local start-api --port 3000 --parameter-overrides LambdaArchitecture=arm64 DynamoDbEndpoint=http://host.docker.internal:8000 TableName=daltime-local",
+      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 && sam local start-api --port 3000 --env-vars local/env.json --profile AdministratorAccess-737780202102 --parameter-overrides LambdaArchitecture=arm64 DynamoDbEndpoint=http://host.docker.internal:8000 TableName=daltime-local CognitoUserPoolId=us-east-1_kzQ806uSv",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },

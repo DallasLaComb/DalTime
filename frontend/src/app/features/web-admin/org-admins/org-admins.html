@@ -51,9 +51,7 @@
               </div>
               <p class="card-text text-muted mb-2" data-testid="admin-email">{{ admin.email }}</p>
               <small class="text-muted d-block mb-3">{{ admin.created_at | date: 'mediumDate' }}</small>
-              @if (admin.status !== 'DISABLED') {
-                <button class="btn btn-sm btn-outline-danger w-100" data-testid="disable-btn" (click)="openDisableModal(admin)">Disable</button>
-              }
+              <button class="btn btn-sm btn-outline-danger w-100" data-testid="delete-btn" (click)="openDeleteModal(admin)">Delete</button>
             </div>
           </div>
         }
@@ -82,9 +80,7 @@
                   </td>
                   <td class="text-muted">{{ admin.created_at | date: 'mediumDate' }}</td>
                   <td class="text-end">
-                    @if (admin.status !== 'DISABLED') {
-                      <button class="btn btn-sm btn-outline-danger" data-testid="disable-btn" (click)="openDisableModal(admin)">Disable</button>
-                    }
+                    <button class="btn btn-sm btn-outline-danger" data-testid="delete-btn" (click)="openDeleteModal(admin)">Delete</button>
                   </td>
                 </tr>
               }
@@ -159,28 +155,28 @@
   </div>
 }
 
-<!-- Disable Confirmation Modal -->
-@if (showDisableModal()) {
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal()) {
   <div class="modal-backdrop fade show"></div>
-  <div class="modal d-block fade show" tabindex="-1" data-testid="disable-modal" (click)="closeDisableModal()">
+  <div class="modal d-block fade show" tabindex="-1" data-testid="delete-modal" (click)="closeDeleteModal()">
     <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Disable Org Admin</h5>
-          <button type="button" class="btn-close" data-testid="close-disable-modal-btn" (click)="closeDisableModal()"></button>
+          <h5 class="modal-title">Delete Org Admin</h5>
+          <button type="button" class="btn-close" data-testid="close-delete-modal-btn" (click)="closeDeleteModal()"></button>
         </div>
         <div class="modal-body">
-          <p>Are you sure you want to disable <strong data-testid="disable-admin-name">{{ disablingAdmin()?.name }}</strong>
-            (<span data-testid="disable-admin-email">{{ disablingAdmin()?.email }}</span>)?</p>
-          <p class="text-muted mb-0">This will prevent them from signing in. Their data is preserved.</p>
+          <p>Are you sure you want to delete <strong data-testid="delete-admin-name">{{ deletingAdmin()?.name }}</strong>
+            (<span data-testid="delete-admin-email">{{ deletingAdmin()?.email }}</span>)?</p>
+          <p class="text-danger mb-0">This will permanently remove their account and cannot be undone.</p>
         </div>
         <div class="modal-footer flex-column flex-sm-row">
-          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-disable-btn" (click)="closeDisableModal()">Cancel</button>
-          <button type="button" class="btn btn-danger w-100 w-sm-auto" data-testid="confirm-disable-btn" [disabled]="saving()" (click)="confirmDisable()">
+          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-delete-btn" (click)="closeDeleteModal()">Cancel</button>
+          <button type="button" class="btn btn-danger w-100 w-sm-auto" data-testid="confirm-delete-btn" [disabled]="saving()" (click)="confirmDelete()">
             @if (saving()) {
               <span class="spinner-border spinner-border-sm me-1" role="status"></span>
             }
-            Disable
+            Delete
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal, type OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { AuthService } from '../../../core/auth/auth';
 import { OrganizationService } from '../../../services/organization.service';
 import type { Organization } from '../../../core/models/organization.model';
@@ -10,16 +10,15 @@ import type { Organization } from '../../../core/models/organization.model';
   styleUrl: './org-admin-dashboard.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class OrgAdminDashboard implements OnInit {
-  private readonly authService = inject(AuthService);
+export class OrgAdminDashboard {
   private readonly orgService = inject(OrganizationService);
 
   readonly org = signal<Organization | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
-  ngOnInit(): void {
-    const orgId = this.authService.orgId;
+  constructor() {
+    const orgId = inject(AuthService).orgId();
     if (!orgId) {
       this.error.set('No organization assigned to your account.');
       this.loading.set(false);

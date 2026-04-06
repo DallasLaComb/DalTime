@@ -16,7 +16,7 @@ import {
   NotFoundError,
   listOrgAdmins,
   createOrgAdmin,
-  disableOrgAdmin,
+  deleteOrgAdmin,
 } from './service.js';
 
 const cognitoClient = new CognitoIdentityProviderClient({});
@@ -34,7 +34,7 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
 
   try {
     if (routeKey === 'GET /web-admin/organizations/{orgId}/org-admins') {
-      return ok(await listOrgAdmins(orgId));
+      return ok(await listOrgAdmins(orgId, cognitoClient));
     }
 
     if (routeKey === 'POST /web-admin/organizations/{orgId}/org-admins') {
@@ -50,7 +50,7 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
 
     if (routeKey === 'DELETE /web-admin/organizations/{orgId}/org-admins/{userId}') {
       if (!userId) return badRequest('userId path parameter is required');
-      await disableOrgAdmin(orgId, userId, cognitoClient);
+      await deleteOrgAdmin(orgId, userId, cognitoClient);
       return noContent();
     }
 

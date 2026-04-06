@@ -2,7 +2,8 @@ import {
   CognitoIdentityProviderClient,
   AdminCreateUserCommand,
   AdminAddUserToGroupCommand,
-  AdminDisableUserCommand,
+  AdminDeleteUserCommand,
+  AdminGetUserCommand,
   UsernameExistsException,
   InvalidPasswordException,
 } from '@aws-sdk/client-cognito-identity-provider';
@@ -21,9 +22,30 @@ export class NotFoundError extends Error {}
 const USER_POOL_ID = process.env['USER_POOL_ID']!;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function listOrgAdmins(orgId: string) {
+export async function listOrgAdmins(
+  orgId: string,
+  cognitoClient: CognitoIdentityProviderClient,
+) {
   const items = await db.listOrgAdminsByOrg(orgId);
-  return items.map(stripKeys);
+  const admins = items.map(stripKeys);
+
+  const withStatus = await Promise.all(
+    admins.map(async (admin) => {
+      try {
+        const user = await cognitoClient.send(
+          new AdminGetUserCommand({
+            UserPoolId: USER_POOL_ID,
+            Username: admin.email,
+          }),
+        );
+        return { ...admin, status: user.UserStatus ?? admin.status };
+      } catch {
+        return admin;
+      }
+    }),
+  );
+
+  return withStatus;
 }
 
 export async function createOrgAdmin(
@@ -51,6 +73,7 @@ export async function createOrgAdmin(
           { Name: 'name', Value: body.name.trim() },
           { Name: 'email', Value: body.email.trim() },
           { Name: 'email_verified', Value: 'true' },
+          { Name: 'custom:org_id', Value: orgId },
         ],
       }),
     );
@@ -93,7 +116,7 @@ export async function createOrgAdmin(
   return stripKeys(user);
 }
 
-export async function disableOrgAdmin(
+export async function deleteOrgAdmin(
   orgId: string,
   userId: string,
   cognitoClient: CognitoIdentityProviderClient,
@@ -102,12 +125,12 @@ export async function disableOrgAdmin(
   if (!lookup) throw new NotFoundError(`User '${userId}' not found`);
 
   await cognitoClient.send(
-    new AdminDisableUserCommand({
+    new AdminDeleteUserCommand({
       UserPoolId: USER_POOL_ID,
       Username: lookup.email,
     }),
   );
 
-  await db.disableOrgAdminUser(orgId, userId);
+  await db.deleteOrgAdminUser(orgId, userId);
   await db.decrementOrgAdminCount(orgId);
 }

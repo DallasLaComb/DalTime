@@ -37,7 +37,8 @@ export class AuthService {
   // --- Scalar state ---
   accessToken: string | null = null;
   idToken: string | null = null;
-  orgId: string | null = null;
+  private readonly _orgId = signal<string | null>(null);
+  readonly orgId = this._orgId.asReadonly();
 
   // --- Challenge state (for NEW_PASSWORD_REQUIRED flow) ---
   private challengeSession: string | null = null;
@@ -47,7 +48,7 @@ export class AuthService {
     return this.challengeSession !== null;
   }
 
-  initialize(): void {
+  async initialize(): Promise<void> {
     const accessToken = sessionStorage.getItem(TOKEN_KEYS.access);
     const idToken = sessionStorage.getItem(TOKEN_KEYS.id);
 
@@ -59,7 +60,7 @@ export class AuthService {
       const role = this.extractUserRole(accessToken);
       this._role.set(role);
 
-      this.getUserAttributes();
+      await this.getUserAttributes();
 
       if (role && ['/', '/login'].includes(window.location.pathname)) {
         this.router.navigate([ROLE_DASHBOARD_MAP[role]]);
@@ -136,7 +137,7 @@ export class AuthService {
     this._role.set(null);
     this.accessToken = null;
     this.idToken = null;
-    this.orgId = null;
+    this._orgId.set(null);
     this.challengeSession = null;
     this.challengeEmail = null;
 
@@ -165,7 +166,7 @@ export class AuthService {
 
       const orgIdAttr = response.UserAttributes?.find((attr) => attr.Name === 'custom:org_id');
       if (orgIdAttr?.Value) {
-        this.orgId = orgIdAttr.Value;
+        this._orgId.set(orgIdAttr.Value);
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -191,7 +192,7 @@ export class AuthService {
     }
   }
 
-  private storeTokens(result: { AccessToken?: string; IdToken?: string; RefreshToken?: string }): void {
+  private async storeTokens(result: { AccessToken?: string; IdToken?: string; RefreshToken?: string }): Promise<void> {
     this.accessToken = result.AccessToken ?? null;
     this.idToken = result.IdToken ?? null;
 
@@ -204,7 +205,7 @@ export class AuthService {
     const role = this.extractUserRole(this.accessToken);
     this._role.set(role);
 
-    this.getUserAttributes();
+    await this.getUserAttributes();
 
     if (role) {
       this.router.navigate([ROLE_DASHBOARD_MAP[role]]);
