@@ -56,18 +56,22 @@ jobs:
 
       - name: Run E2E tests
         run: |
+          if [ -z "$E2E_PASSWORD" ]; then
+            echo "ERROR: E2E_WEB_ADMIN_PASSWORD secret is not set for this environment"
+            exit 1
+          fi
           robot \
             --outputdir results \
             --variable BASE_URL:${{ steps.env.outputs.base_url }} \
             --variable WEB_ADMIN_EMAIL:${{ steps.env.outputs.web_admin_email }} \
-            --variable WEB_ADMIN_PASSWORD:${{ secrets.E2E_WEB_ADMIN_PASSWORD }} \
+            --variable "WEB_ADMIN_PASSWORD:${E2E_PASSWORD}" \
             --variable COGNITO_REGION:us-east-1 \
             --variable COGNITO_CLIENT_ID:${{ steps.env.outputs.cognito_client_id }} \
             --variable HEADLESS:true \
             --variable SLOW_MO:0ms \
             robot/tests/
         env:
-          BROWSER: chromium
+          E2E_PASSWORD: ${{ secrets.E2E_WEB_ADMIN_PASSWORD }}
 
       - name: Upload test results
         if: always()

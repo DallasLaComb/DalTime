@@ -4,12 +4,16 @@ Library          Browser
 Resource         ../../resources/auth.robot
 Resource         ../../resources/env.robot
 
+Suite Setup      Open Login Browser
 Suite Teardown   Close Browser
+
+*** Keywords ***
+Open Login Browser
+    New Browser    firefox    headless=${HEADLESS}    slowMo=${SLOW_MO}
 
 *** Test Cases ***
 Login Page Renders
     [Documentation]    The login page should show email, password, and sign in button.
-    New Browser    firefox    headless=${HEADLESS}    slowMo=${SLOW_MO}
     New Page       ${BASE_URL}/login
     Get Element Count    [data-testid="email-input"]       ==    1
     Get Element Count    [data-testid="password-input"]     ==    1
@@ -17,7 +21,6 @@ Login Page Renders
 
 Login Shows Validation Errors
     [Documentation]    Clicking sign in with empty fields shows validation errors.
-    New Browser    firefox    headless=${HEADLESS}    slowMo=${SLOW_MO}
     New Page       ${BASE_URL}/login
     Click          [data-testid="sign-in-btn"]
     Get Text       [data-testid="email-error"]       ==    Email is required
@@ -25,7 +28,6 @@ Login Shows Validation Errors
 
 Login With Invalid Credentials Shows Error
     [Documentation]    Entering wrong credentials shows an error message.
-    New Browser    firefox    headless=${HEADLESS}    slowMo=${SLOW_MO}
     New Page       ${BASE_URL}/login
     Fill Text      [data-testid="email-input"]       wrong@example.com
     Fill Text      [data-testid="password-input"]     WrongPassword123!
