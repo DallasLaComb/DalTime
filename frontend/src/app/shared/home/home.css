@@ -184,23 +184,6 @@
   margin-bottom: 2.5rem;
 }
 
-/* ── Footer ── */
-.home-footer {
-  padding: 2rem 0;
-  background: #111;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.875rem;
-}
-
-.footer-link {
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.footer-link:hover {
-  color: #fff;
-}
 
 /* ── Animations ── */
 @keyframes fadeInUp {
