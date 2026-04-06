@@ -1,21 +1,28 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top">
   <div class="container-fluid px-4">
     <a class="navbar-brand d-flex align-items-center gap-2" [routerLink]="dashboardRoute()">
       <img src="daltime-logo.png" alt="DalTime" height="32" />
       DalTime
     </a>
 
-    <button
-      class="navbar-toggler"
-      type="button"
-      [attr.aria-expanded]="menuOpen()"
-      aria-controls="mainNav"
-      aria-label="Toggle navigation"
-      (click)="toggleMenu()"
-    >
-      <span class="navbar-toggler-icon"></span>
-    </button>
+    @if (authService.isAuthenticatedSignal()) {
+      <button
+        class="navbar-toggler"
+        type="button"
+        [attr.aria-expanded]="menuOpen()"
+        aria-controls="mainNav"
+        aria-label="Toggle navigation"
+        (click)="toggleMenu()"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    } @else {
+      <button class="btn btn-dark btn-sm" routerLink="/login">
+        Sign In
+      </button>
+    }
 
+    @if (authService.isAuthenticatedSignal()) {
     <div class="collapse navbar-collapse" id="mainNav" [class.show]="menuOpen()">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         @if (role() === 'WebAdmin') {
@@ -107,26 +114,19 @@
       </ul>
 
       <ul class="navbar-nav align-items-center gap-2">
-        @if (authService.isAuthenticatedSignal()) {
-          @if (role()) {
-            <li class="nav-item">
-              <a class="nav-link" [routerLink]="profileRoute()" routerLinkActive="active" (click)="closeMenu()">Profile</a>
-            </li>
-          }
+        @if (role()) {
           <li class="nav-item">
-            <button class="btn btn-outline-dark btn-sm" (click)="openSignOutModal()">
-              Sign Out
-            </button>
-          </li>
-        } @else {
-          <li class="nav-item">
-            <button class="btn btn-dark btn-sm" routerLink="/login" (click)="closeMenu()">
-              Sign In
-            </button>
+            <a class="nav-link" [routerLink]="profileRoute()" routerLinkActive="active" (click)="closeMenu()">Profile</a>
           </li>
         }
+        <li class="nav-item">
+          <button class="btn btn-outline-dark btn-sm" (click)="openSignOutModal()">
+            Sign Out
+          </button>
+        </li>
       </ul>
     </div>
+    }
   </div>
 </nav>
 
