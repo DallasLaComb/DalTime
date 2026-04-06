@@ -1,38 +1,55 @@
 # E2E Tests (Robot Framework)
 
+## Structure
+
+```
+robot/
+├── requirements.txt          # Python dependencies
+├── resources/
+│   ├── env.robot             # Environment variables (URLs, emails)
+│   └── auth.robot            # Login/logout keywords
+└── tests/
+    └── web-admin/
+        └── smoke.robot       # WebAdmin smoke tests
+```
+
 ## Setup
 
 ```bash
 cd robot
-
-# Create a Python virtual environment
 python3 -m venv .venv
-
-# Activate the virtual environment
 source .venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Initialize Playwright browsers (downloads Chromium, Firefox, WebKit)
 rfbrowser init
 ```
 
-## Running tests
+## Running locally
 
 ```bash
-# Make sure the venv is active
 source .venv/bin/activate
 
-# Run all tests
-robot .
+# Run against dev (default)
+robot \
+  --outputdir results \
+  --variable WEB_ADMIN_PASSWORD:your-password-here \
+  tests/
 
-# Run with results output to a specific directory
-robot --outputdir results .
+# Run against a specific environment
+robot \
+  --outputdir results \
+  --variable BASE_URL:https://qa.daltime.com \
+  --variable WEB_ADMIN_EMAIL:robot-qa@daltime.com \
+  --variable WEB_ADMIN_PASSWORD:your-password-here \
+  tests/
 ```
 
-## Deactivating the venv
+## Pipeline
 
-```bash
-deactivate
-```
+E2E tests run automatically after a successful CD deploy to dev or qa.
+Credentials are stored as GitHub environment secrets (`E2E_WEB_ADMIN_PASSWORD`).
+
+## Adding tests
+
+1. Create a new `.robot` file under `tests/<role>/`
+2. Use `Login As Web Admin` from `resources/auth.robot` for authenticated tests
+3. Use `data-testid` attributes to locate elements
