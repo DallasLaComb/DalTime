@@ -1,14 +1,12 @@
-# /new-component
-
 Spec-driven workflow for a new Angular feature (component + service + model + tests).
 
-**Usage:** `/new-component <role>/<feature-name>`
+**Usage:** Provide the argument as `<role>/<feature-name>` after referencing this prompt.
 
-**Example:** `/new-component web-admin/organizations`
+**Example:** `@new-component web-admin/organizations`
 
 ---
 
-You are implementing a new Angular feature for DalTime using spec-driven development. The feature is: **$ARGUMENTS**
+You are implementing a new Angular feature for DalTime using spec-driven development. The feature is specified in my message.
 
 Parse the argument as `<role>/<feature-name>`. Valid roles: `web-admin`, `org-admin`, `manager`, `employee`.
 
@@ -62,11 +60,11 @@ Numbered list of field-level and form-level validation rules.
 | Employee | redirect to /unauthorized |
 ```
 
-After writing the spec, **stop and ask the user to review it** before continuing to Step 2.
+After writing the spec, **stop and ask me to review it** before continuing to Step 2.
 
 ---
 
-## Step 2 — Implement (only after user approves the spec)
+## Step 2 — Implement (only after I approve the spec)
 
 Implement in this exact order. Check what already exists before creating files.
 

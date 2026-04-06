@@ -13,6 +13,8 @@ export class Navbar {
   protected readonly authService = inject(AuthService);
   protected readonly role = this.authService.roleSignal;
   protected readonly menuOpen = signal(false);
+  protected readonly showSignOutModal = signal(false);
+  protected readonly signingOut = signal(false);
 
   protected readonly dashboardRoute = computed(() => {
     const r = this.role();
@@ -30,5 +32,19 @@ export class Navbar {
 
   protected closeMenu(): void {
     this.menuOpen.set(false);
+  }
+
+  protected openSignOutModal(): void {
+    this.closeMenu();
+    this.showSignOutModal.set(true);
+  }
+
+  protected closeSignOutModal(): void {
+    this.showSignOutModal.set(false);
+  }
+
+  protected confirmSignOut(): void {
+    this.signingOut.set(true);
+    this.authService.logout();
   }
 }

@@ -107,17 +107,51 @@
       </ul>
 
       <ul class="navbar-nav align-items-center gap-2">
-        @if (role()) {
+        @if (authService.isAuthenticatedSignal()) {
+          @if (role()) {
+            <li class="nav-item">
+              <a class="nav-link" [routerLink]="profileRoute()" routerLinkActive="active" (click)="closeMenu()">Profile</a>
+            </li>
+          }
           <li class="nav-item">
-            <a class="nav-link" [routerLink]="profileRoute()" routerLinkActive="active" (click)="closeMenu()">Profile</a>
+            <button class="btn btn-outline-dark btn-sm" (click)="openSignOutModal()">
+              Sign Out
+            </button>
+          </li>
+        } @else {
+          <li class="nav-item">
+            <button class="btn btn-dark btn-sm" (click)="authService.login()">
+              Sign In
+            </button>
           </li>
         }
-        <li class="nav-item">
-          <button class="btn btn-outline-dark btn-sm" (click)="authService.logout()">
-            Sign Out
-          </button>
-        </li>
       </ul>
     </div>
   </div>
 </nav>
+
+@if (showSignOutModal()) {
+  <div class="modal-backdrop fade show"></div>
+  <div class="modal d-block fade show" tabindex="-1" (click)="closeSignOutModal()">
+    <div class="modal-dialog modal-dialog-centered" (click)="$event.stopPropagation()">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Sign Out</h5>
+          <button type="button" class="btn-close" (click)="closeSignOutModal()"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to sign out?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" (click)="closeSignOutModal()">Cancel</button>
+          <button type="button" class="btn btn-dark" [disabled]="signingOut()" (click)="confirmSignOut()">
+            @if (signingOut()) {
+              <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
