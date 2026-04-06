@@ -11,7 +11,7 @@ const mockOrg: Organization = {
   address: '123 Main St',
   created_at: '2025-01-01T00:00:00.000Z',
   updated_at: '2025-01-01T00:00:00.000Z',
-  org_admin_ids: [],
+  org_admin_count: 0,
 };
 
 const mockOrg2: Organization = {
@@ -20,7 +20,7 @@ const mockOrg2: Organization = {
   address: '456 Oak Ave',
   created_at: '2025-02-01T00:00:00.000Z',
   updated_at: '2025-02-01T00:00:00.000Z',
-  org_admin_ids: [],
+  org_admin_count: 0,
 };
 
 function buildOrgServiceMock(overrides: Partial<Record<keyof OrganizationService, unknown>> = {}) {

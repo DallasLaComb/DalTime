@@ -35,7 +35,7 @@ export async function createOrganization(body: CreateOrganizationBody) {
     address: body.address.trim(),
     created_at: now,
     updated_at: now,
-    org_admin_ids: [],
+    org_admin_count: 0,
   };
 
   await db.createOrganization(org);

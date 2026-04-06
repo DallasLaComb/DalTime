@@ -22,7 +22,7 @@
     {
       "label": "Backend: Start Local API",
       "type": "shell",
-      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 && sam local start-api --port 3000 --env-vars local/env.json --warm-containers EAGER --parameter-overrides LambdaArchitecture=arm64",
+      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 && sam local start-api --port 3000 --parameter-overrides LambdaArchitecture=arm64 DynamoDbEndpoint=http://host.docker.internal:8000 TableName=daltime-local",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -45,7 +45,17 @@
         "panel": "dedicated",
         "clear": false
       },
-      "dependsOn": ["DynamoDB Local: Create Tables"]
+      "dependsOn": ["DynamoDB Local: Create Tables", "Docker: Clean SAM Containers"]
+    },
+    {
+      "label": "Docker: Clean SAM Containers",
+      "type": "shell",
+      "command": "docker ps -aq --filter ancestor=public.ecr.aws/lambda/nodejs:24-rapid-arm64 | xargs -r docker rm -f 2>/dev/null; echo 'Stale SAM containers cleaned.'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     },
     {
       "label": "Backend: Invoke Test Function",

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { OrganizationService } from '../../../services/organization.service';
 import type { Organization } from '../../../core/models/organization.model';
 
@@ -12,19 +13,18 @@ import type { Organization } from '../../../core/models/organization.model';
 })
 export class OrganizationsComponent {
   private readonly orgService = inject(OrganizationService);
+  private readonly router = inject(Router);
 
   readonly organizations = signal<Organization[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
-  // Modal state
   readonly showModal = signal(false);
   readonly showDeleteModal = signal(false);
   readonly editingOrg = signal<Organization | null>(null);
   readonly deletingOrg = signal<Organization | null>(null);
   readonly saving = signal(false);
 
-  // Form state as signals
   readonly formName = signal('');
   readonly formAddress = signal('');
 
@@ -100,6 +100,10 @@ export class OrganizationsComponent {
         },
       });
     }
+  }
+
+  manageAdmins(org: Organization): void {
+    this.router.navigate(['/web-admin/organizations', org.org_id, 'org-admins']);
   }
 
   openDeleteModal(org: Organization): void {
