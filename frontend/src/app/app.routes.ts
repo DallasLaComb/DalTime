@@ -3,10 +3,20 @@ import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
-  // OIDC callback — public, renders while checkAuth() processes the authorization code
+  // Public auth pages
   {
-    path: 'sso',
-    loadComponent: () => import('./core/auth/callback.component').then((m) => m.CallbackComponent),
+    path: 'login',
+    loadComponent: () => import('./core/auth/login/login').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'change-password',
+    loadComponent: () =>
+      import('./core/auth/change-password/change-password').then((m) => m.ChangePasswordComponent),
+  },
+  {
+    path: 'forgot-password',
+    loadComponent: () =>
+      import('./core/auth/forgot-password/forgot-password').then((m) => m.ForgotPasswordComponent),
   },
 
   // Unauthorized — public, shows access denied with role info
@@ -17,6 +27,13 @@ export const routes: Routes = [
   },
 
   // Role-protected dashboards
+  {
+    path: 'web-admin/organizations/:orgId/org-admins',
+    canMatch: [authGuard, roleGuard],
+    data: { roles: ['WebAdmin'] as const },
+    loadComponent: () =>
+      import('./features/web-admin/org-admins/org-admins').then((m) => m.OrgAdminsComponent),
+  },
   {
     path: 'web-admin/organizations',
     canMatch: [authGuard, roleGuard],
@@ -63,13 +80,11 @@ export const routes: Routes = [
       ),
   },
 
-  // Root: authGuard triggers login for unauthenticated users;
-  // authenticated users are navigated to their role dashboard by AuthService.initialize()
+  // Home — public landing page; authenticated users are redirected by AuthService.initialize()
   {
     path: '',
     pathMatch: 'full',
-    canMatch: [authGuard],
-    loadComponent: () => import('./core/auth/callback.component').then((m) => m.CallbackComponent),
+    loadComponent: () => import('./shared/home/home').then((m) => m.HomeComponent),
   },
 
   // 404 — catch-all for unknown routes

@@ -1,27 +1,14 @@
 import { inject } from '@angular/core';
-import { type CanMatchFn } from '@angular/router';
-import { filter, first, switchMap, map } from 'rxjs/operators';
+import { type CanMatchFn, Router } from '@angular/router';
 import { AuthService } from '../auth/auth';
 
 export const authGuard: CanMatchFn = () => {
   const auth = inject(AuthService);
+  const router = inject(Router);
 
-  return auth.authReady$.pipe(
-    filter((ready) => ready),
-    first(),
-    switchMap(() => auth.isAuthenticated$),
-    first(),
-    map((isAuthenticated) => {
-      if (!isAuthenticated) {
-        if (auth.isLoggedOut) {
-          console.log('[AuthGuard] User logged out — skipping auto-login');
-          return false;
-        }
-        console.log('[AuthGuard] Not authenticated — triggering login');
-        auth.login();
-        return false;
-      }
-      return true;
-    }),
-  );
+  if (!auth.authReady()) return false;
+
+  if (auth.isAuthenticatedSignal()) return true;
+
+  return router.createUrlTree(['/login']);
 };

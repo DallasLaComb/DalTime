@@ -1,122 +1,150 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { BehaviorSubject, map } from 'rxjs';
-import { OidcSecurityService } from 'angular-auth-oidc-client';
 import { environment } from '../../../environments/environment';
 import {
   CognitoIdentityProviderClient,
+  InitiateAuthCommand,
+  RespondToAuthChallengeCommand,
   GetUserCommand,
   UpdateUserAttributesCommand,
+  ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { type UserRole, isValidRole, ROLE_DASHBOARD_MAP } from './user-role.model';
 
-@Injectable({
-  providedIn: 'root',
-})
-export class AuthService {
-  private readonly oidcSecurityService = inject(OidcSecurityService);
-  private readonly router = inject(Router);
+const TOKEN_KEYS = {
+  access: 'daltime_access_token',
+  id: 'daltime_id_token',
+  refresh: 'daltime_refresh_token',
+} as const;
 
-  // No AWS credentials needed — GetUser/UpdateUserAttributes are authorized by the access token's
-  // aws.cognito.signin.user.admin scope, not by IAM credentials
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  private readonly router = inject(Router);
   private readonly cognitoClient = new CognitoIdentityProviderClient({
     region: environment.cognito.region,
   });
 
   // --- Reactive state ---
-  private readonly _authReady$ = new BehaviorSubject<boolean>(false);
-  private readonly _role$ = new BehaviorSubject<UserRole | null>(null);
+  private readonly _isAuthenticated = signal(false);
+  private readonly _role = signal<UserRole | null>(null);
+  private readonly _authReady = signal(false);
 
-  /** Emits true once checkAuth() has resolved (both success and failure). */
-  readonly authReady$ = this._authReady$.asObservable();
+  readonly isAuthenticatedSignal = this._isAuthenticated.asReadonly();
+  readonly roleSignal = this._role.asReadonly();
+  readonly authReady = this._authReady.asReadonly();
 
-  /** Observable of current authentication state. */
-  readonly isAuthenticated$ = this.oidcSecurityService.isAuthenticated$.pipe(
-    map(({ isAuthenticated }) => isAuthenticated),
-  );
-
-  /** Observable of user claims/profile from the OIDC library. */
-  readonly user$ = this.oidcSecurityService.userData$.pipe(map((r) => r.userData));
-
-  /** Observable of the derived UserRole (null until auth resolves). */
-  readonly role$ = this._role$.asObservable();
-
-  // --- Signals for template binding ---
-  readonly isAuthenticatedSignal = toSignal(this.isAuthenticated$, { initialValue: false });
-  readonly userSignal = toSignal(this.user$, { initialValue: null });
-  readonly roleSignal = toSignal(this.role$, { initialValue: null });
-
-  // --- Scalar state (used by Cognito SDK calls) ---
+  // --- Scalar state ---
   accessToken: string | null = null;
   idToken: string | null = null;
   orgId: string | null = null;
 
-  /** True after explicit logout — prevents authGuard from auto-triggering login. */
-  private _loggedOut = false;
+  // --- Challenge state (for NEW_PASSWORD_REQUIRED flow) ---
+  private challengeSession: string | null = null;
+  private challengeEmail: string | null = null;
 
-  /** Whether the user explicitly logged out (checked by authGuard). */
-  get isLoggedOut(): boolean {
-    return this._loggedOut;
+  get hasPendingChallenge(): boolean {
+    return this.challengeSession !== null;
   }
 
   initialize(): void {
-    // checkAuth() detects code+state params in the URL automatically and exchanges for tokens.
-    // No manual code detection needed — the OIDC library handles the entire callback flow.
-    this.oidcSecurityService.checkAuth().subscribe((loginResponse) => {
-      if (loginResponse.errorMessage) {
-        console.error('Authentication error:', loginResponse.errorMessage);
+    const accessToken = sessionStorage.getItem(TOKEN_KEYS.access);
+    const idToken = sessionStorage.getItem(TOKEN_KEYS.id);
+
+    if (accessToken && idToken && !this.isTokenExpired(accessToken)) {
+      this.accessToken = accessToken;
+      this.idToken = idToken;
+      this._isAuthenticated.set(true);
+
+      const role = this.extractUserRole(accessToken);
+      this._role.set(role);
+
+      this.getUserAttributes();
+
+      if (role && ['/', '/login'].includes(window.location.pathname)) {
+        this.router.navigate([ROLE_DASHBOARD_MAP[role]]);
       }
+    }
 
-      if (loginResponse.isAuthenticated) {
-        this.accessToken = loginResponse.accessToken;
-        this.idToken = loginResponse.idToken;
-
-        const role = this.extractUserRole(loginResponse.accessToken);
-        this._role$.next(role);
-
-        this.getUserAttributes();
-
-        // Strip code/state params from the URL after the callback is processed
-        if (window.location.search.includes('code=')) {
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-
-        if (role && ['/', '/sso'].includes(window.location.pathname)) {
-          this.router.navigate([ROLE_DASHBOARD_MAP[role]]);
-        }
-      }
-
-      // Gate opens for guards — must fire in both authenticated and unauthenticated branches
-      this._authReady$.next(true);
-    });
+    this._authReady.set(true);
   }
 
-  login(): void {
-    this._loggedOut = false;
+  async login(email: string, password: string): Promise<{ success: boolean; challenge?: string; error?: string }> {
+    try {
+      const response = await this.cognitoClient.send(
+        new InitiateAuthCommand({
+          AuthFlow: 'USER_PASSWORD_AUTH',
+          ClientId: environment.cognito.clientId,
+          AuthParameters: {
+            USERNAME: email,
+            PASSWORD: password,
+          },
+        }),
+      );
 
-    // Clear stale cached tokens so the next login gets fresh tokens with correct scopes.
-    // Without this, old tokens (possibly missing aws.cognito.signin.user.admin) persist in storage.
-    this.oidcSecurityService.logoffLocal();
+      if (response.ChallengeName === 'NEW_PASSWORD_REQUIRED') {
+        this.challengeSession = response.Session ?? null;
+        this.challengeEmail = email;
+        return { success: false, challenge: 'NEW_PASSWORD_REQUIRED' };
+      }
 
-    // authorize() uses scopes from the provideAuth() config in app.config.ts:
-    // 'openid email phone profile aws.cognito.signin.user.admin'
-    this.oidcSecurityService.authorize();
+      if (response.AuthenticationResult) {
+        this.storeTokens(response.AuthenticationResult);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Unexpected response from authentication service.' };
+    } catch (err: unknown) {
+      return { success: false, error: this.mapAuthError(err) };
+    }
+  }
+
+  async completeNewPassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.challengeSession || !this.challengeEmail) {
+      return { success: false, error: 'No pending password challenge.' };
+    }
+
+    try {
+      const response = await this.cognitoClient.send(
+        new RespondToAuthChallengeCommand({
+          ClientId: environment.cognito.clientId,
+          ChallengeName: 'NEW_PASSWORD_REQUIRED',
+          Session: this.challengeSession,
+          ChallengeResponses: {
+            USERNAME: this.challengeEmail,
+            NEW_PASSWORD: newPassword,
+          },
+        }),
+      );
+
+      this.challengeSession = null;
+      this.challengeEmail = null;
+
+      if (response.AuthenticationResult) {
+        this.storeTokens(response.AuthenticationResult);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Unexpected response from authentication service.' };
+    } catch (err: unknown) {
+      return { success: false, error: this.mapAuthError(err) };
+    }
   }
 
   logout(): void {
-    this._role$.next(null);
+    this._isAuthenticated.set(false);
+    this._role.set(null);
     this.accessToken = null;
     this.idToken = null;
     this.orgId = null;
+    this.challengeSession = null;
+    this.challengeEmail = null;
 
-    this.oidcSecurityService.logoff().subscribe({
-      error: (err) => {
-        console.error('[Auth] Logoff failed:', err);
-        this.oidcSecurityService.logoffLocal();
-        this.router.navigate(['/']);
-      },
-    });
+    sessionStorage.removeItem(TOKEN_KEYS.access);
+    sessionStorage.removeItem(TOKEN_KEYS.id);
+    sessionStorage.removeItem(TOKEN_KEYS.refresh);
+
+    this.router.navigate(['/']);
   }
 
   getAccessToken(): string | null {
@@ -127,36 +155,8 @@ export class AuthService {
     return ROLE_DASHBOARD_MAP[role];
   }
 
-  /**
-   * Extracts UserRole from the Cognito access token's cognito:groups claim.
-   * Groups are only present in the access token, not the ID token/userData.
-   * The first matching group (by precedence order in VALID_ROLES) is used.
-   */
-  private extractUserRole(accessToken: string | null): UserRole | null {
-    if (!accessToken) return null;
-
-    try {
-      const payload = JSON.parse(atob(accessToken.split('.')[1]));
-      const groups: unknown[] = payload['cognito:groups'] ?? [];
-      const role = groups.find((g) => isValidRole(g)) as UserRole | undefined;
-      if (role) return role;
-    } catch {
-      // malformed token — fall through to warning
-    }
-
-    console.warn('No valid Cognito group found in access token.');
-    return null;
-  }
-
-  /**
-   * Calls Cognito GetUser API using the access token (not ID token).
-   * Requires aws.cognito.signin.user.admin scope on the access token.
-   */
   async getUserAttributes(): Promise<void> {
-    if (!this.accessToken) {
-      console.error('No access token available for GetUser call');
-      return;
-    }
+    if (!this.accessToken) return;
 
     try {
       const response = await this.cognitoClient.send(
@@ -167,20 +167,14 @@ export class AuthService {
       if (orgIdAttr?.Value) {
         this.orgId = orgIdAttr.Value;
       }
-    } catch (error: any) {
-      console.error('GetUser failed:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('GetUser failed:', message);
     }
   }
 
-  /**
-   * Calls Cognito UpdateUserAttributes API using the access token.
-   * Requires aws.cognito.signin.user.admin scope on the access token.
-   */
   async updateUserAttribute(attributeName: string, attributeValue: string): Promise<boolean> {
-    if (!this.accessToken) {
-      console.error('No access token available for UpdateUserAttributes call');
-      return false;
-    }
+    if (!this.accessToken) return false;
 
     try {
       await this.cognitoClient.send(
@@ -190,9 +184,99 @@ export class AuthService {
         }),
       );
       return true;
-    } catch (error: any) {
-      console.error('UpdateUserAttributes failed:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('UpdateUserAttributes failed:', message);
       return false;
+    }
+  }
+
+  private storeTokens(result: { AccessToken?: string; IdToken?: string; RefreshToken?: string }): void {
+    this.accessToken = result.AccessToken ?? null;
+    this.idToken = result.IdToken ?? null;
+
+    if (result.AccessToken) sessionStorage.setItem(TOKEN_KEYS.access, result.AccessToken);
+    if (result.IdToken) sessionStorage.setItem(TOKEN_KEYS.id, result.IdToken);
+    if (result.RefreshToken) sessionStorage.setItem(TOKEN_KEYS.refresh, result.RefreshToken);
+
+    this._isAuthenticated.set(true);
+
+    const role = this.extractUserRole(this.accessToken);
+    this._role.set(role);
+
+    this.getUserAttributes();
+
+    if (role) {
+      this.router.navigate([ROLE_DASHBOARD_MAP[role]]);
+    }
+  }
+
+  private extractUserRole(accessToken: string | null): UserRole | null {
+    if (!accessToken) return null;
+
+    try {
+      const payload = JSON.parse(atob(accessToken.split('.')[1]));
+      const groups: unknown[] = payload['cognito:groups'] ?? [];
+      const role = groups.find((g) => isValidRole(g)) as UserRole | undefined;
+      if (role) return role;
+    } catch {
+      // malformed token
+    }
+
+    console.warn('No valid Cognito group found in access token.');
+    return null;
+  }
+
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return Date.now() >= payload.exp * 1000;
+    } catch {
+      return true;
+    }
+  }
+
+  private mapAuthError(err: unknown): string {
+    if (err instanceof Error) {
+      if (err.name === 'NotAuthorizedException') return 'Incorrect email or password.';
+      if (err.name === 'UserNotFoundException') return 'Incorrect email or password.';
+      if (err.name === 'UserNotConfirmedException') return 'Account not confirmed. Contact your administrator.';
+      if (err.name === 'InvalidPasswordException') return err.message;
+      if (err.name === 'InvalidParameterException') return err.message;
+      if (err.name === 'CodeMismatchException') return 'Invalid verification code.';
+      if (err.name === 'ExpiredCodeException') return 'Verification code has expired. Please request a new one.';
+      if (err.name === 'LimitExceededException') return 'Too many attempts. Please try again later.';
+    }
+    return 'An unexpected error occurred. Please try again.';
+  }
+
+  async forgotPassword(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.cognitoClient.send(
+        new ForgotPasswordCommand({
+          ClientId: environment.cognito.clientId,
+          Username: email,
+        }),
+      );
+      return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: this.mapAuthError(err) };
+    }
+  }
+
+  async confirmForgotPassword(email: string, code: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.cognitoClient.send(
+        new ConfirmForgotPasswordCommand({
+          ClientId: environment.cognito.clientId,
+          Username: email,
+          ConfirmationCode: code,
+          Password: newPassword,
+        }),
+      );
+      return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: this.mapAuthError(err) };
     }
   }
 }

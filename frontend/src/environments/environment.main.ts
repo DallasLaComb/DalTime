@@ -6,7 +6,7 @@ export const environment = {
     userPoolId: 'us-east-1_7NEt59Aww',
     clientId: '6jrasd3u6dc7g9p4osd4rshn91',
     region: 'us-east-1',
-    domain: 'https://us-east-17net59aww.auth.us-east-1.amazoncognito.com',
+    domain: 'us-east-17net59aww.auth.us-east-1.amazoncognito.com',
   },
   api: {
     baseUrl: '__API_BASE_URL__', // Replaced by pipeline with deployed API Gateway URL

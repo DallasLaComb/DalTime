@@ -19,12 +19,15 @@
   "author": "Dallas LaComb",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1024.0",
     "@aws-sdk/client-dynamodb": "^3.995.0",
     "@aws-sdk/lib-dynamodb": "^3.995.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.160",
     "@types/node": "^25.3.0",
+    "aws-sdk-client-mock": "^4.1.0",
+    "aws-sdk-client-mock-vitest": "^7.0.1",
     "esbuild": "^0.27.3",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"

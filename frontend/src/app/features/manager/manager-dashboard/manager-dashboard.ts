@@ -8,7 +8,5 @@ import { AuthService } from '../../../core/auth/auth';
   styleUrl: './manager-dashboard.css',
 })
 export class ManagerDashboard {
-  protected readonly authService = inject(AuthService);
-  protected readonly user = this.authService.userSignal;
-  protected readonly role = this.authService.roleSignal;
+  protected readonly role = inject(AuthService).roleSignal;
 }
