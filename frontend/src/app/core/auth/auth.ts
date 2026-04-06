@@ -105,18 +105,18 @@ export class AuthService {
   }
 
   logout(): void {
+    this._loggedOut = true;
     this._role$.next(null);
     this.accessToken = null;
     this.idToken = null;
     this.orgId = null;
 
-    this.oidcSecurityService.logoff().subscribe({
-      error: (err) => {
-        console.error('[Auth] Logoff failed:', err);
-        this.oidcSecurityService.logoffLocal();
-        this.router.navigate(['/']);
-      },
-    });
+    this.oidcSecurityService.logoffLocal();
+
+    const domain = environment.cognito.domain;
+    const clientId = environment.cognito.clientId;
+    const logoutUri = encodeURIComponent(window.location.origin);
+    window.location.href = `https://${domain}/logout?client_id=${clientId}&logout_uri=${logoutUri}`;
   }
 
   getAccessToken(): string | null {

@@ -1,14 +1,12 @@
-# /spec-review
-
 Audit an existing implementation against its spec document.
 
-**Usage:** `/spec-review <role>/<feature-name>`
+**Usage:** Provide the argument as `<role>/<feature-name>` after referencing this prompt.
 
-**Example:** `/spec-review web-admin/organizations`
+**Example:** `@spec-review web-admin/organizations`
 
 ---
 
-You are auditing an existing DalTime feature against its spec. The feature is: **$ARGUMENTS**
+You are auditing an existing DalTime feature against its spec. The feature is specified in my message.
 
 Parse the argument as `<role>/<feature-name>`.
 
@@ -17,7 +15,7 @@ Parse the argument as `<role>/<feature-name>`.
 ### 1. Locate the Spec
 Read `specs/lambda/<role>/<feature-name>.spec.md` OR `specs/component/<role>/<feature-name>.spec.md` (check both).
 
-If no spec exists, **stop and report** — the feature is missing its spec. Do not proceed with a review; instead ask the user if they want to run `/new-lambda` or `/new-component` to create a retroactive spec.
+If no spec exists, **stop and report** — the feature is missing its spec. Do not proceed with a review; instead ask me if I want to use `@new-lambda` or `@new-component` to create a retroactive spec.
 
 ### 2. Read the Implementation
 
@@ -90,4 +88,4 @@ A numbered, prioritized list of what to fix. Group by: Critical (breaks tests or
 
 ---
 
-After producing the report, ask the user which items they want addressed before making any code changes.
+After producing the report, ask me which items I want addressed before making any code changes.

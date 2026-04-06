@@ -1,14 +1,12 @@
-# /new-lambda
-
 Spec-driven workflow for a new Lambda feature.
 
-**Usage:** `/new-lambda <role>/<feature-name>`
+**Usage:** Provide the argument as `<role>/<feature-name>` after referencing this prompt.
 
-**Example:** `/new-lambda web-admin/users`
+**Example:** `@new-lambda web-admin/users`
 
 ---
 
-You are implementing a new Lambda feature for DalTime using spec-driven development. The feature is: **$ARGUMENTS**
+You are implementing a new Lambda feature for DalTime using spec-driven development. The feature is specified in my message.
 
 Parse the argument as `<role>/<feature-name>`. Valid roles: `web-admin`, `org-admin`, `manager`, `employee`.
 
@@ -57,11 +55,11 @@ Numbered list of validation rules, constraints, and logic that must be enforced.
 | DynamoDB failure | GET /... | DynamoDB throws | 500 | |
 ```
 
-After writing the spec, **stop and ask the user to review it** before continuing to Step 2.
+After writing the spec, **stop and ask me to review it** before continuing to Step 2.
 
 ---
 
-## Step 2 — Implement (only after user approves the spec)
+## Step 2 — Implement (only after I approve the spec)
 
 Implement in this exact order. Check what already exists before creating files.
 
