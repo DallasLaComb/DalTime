@@ -8,6 +8,7 @@ vi.mock('../../../../src/functions/web-admin/org-admins/service.js', () => ({
   listOrgAdmins: vi.fn(),
   createOrgAdmin: vi.fn(),
   disableOrgAdmin: vi.fn(),
+  deleteOrgAdmin: vi.fn(),
 }));
 
 // Prevent the real CognitoIdentityProviderClient from being instantiated.
@@ -18,7 +19,8 @@ vi.mock('@aws-sdk/client-cognito-identity-provider', () => ({
   },
   AdminCreateUserCommand: vi.fn(),
   AdminAddUserToGroupCommand: vi.fn(),
-  AdminDisableUserCommand: vi.fn(),
+  AdminDeleteUserCommand: vi.fn(),
+  AdminGetUserCommand: vi.fn(),
   UsernameExistsException: class UsernameExistsException extends Error {},
   InvalidPasswordException: class InvalidPasswordException extends Error {},
 }));
@@ -31,6 +33,7 @@ import {
   listOrgAdmins,
   createOrgAdmin,
   disableOrgAdmin,
+  deleteOrgAdmin,
 } from '../../../../src/functions/web-admin/org-admins/service.js';
 
 // ─── Factories ────────────────────────────────────────────────────────────────
@@ -204,9 +207,9 @@ describe('POST /web-admin/organizations/{orgId}/org-admins — create', () => {
 
 // ─── DELETE /web-admin/organizations/{orgId}/org-admins/{userId} ─────────────
 
-describe('DELETE /web-admin/organizations/{orgId}/org-admins/{userId} — disable', () => {
-  it('returns 204 when user is disabled', async () => {
-    vi.mocked(disableOrgAdmin).mockResolvedValue(undefined);
+describe('DELETE /web-admin/organizations/{orgId}/org-admins/{userId} — delete', () => {
+  it('returns 204 when user is deleted', async () => {
+    vi.mocked(deleteOrgAdmin).mockResolvedValue(undefined);
     const result = (await handler(
       buildApiGwEvent({
         method: 'DELETE',
@@ -230,7 +233,7 @@ describe('DELETE /web-admin/organizations/{orgId}/org-admins/{userId} — disabl
   });
 
   it('returns 404 when user is not found', async () => {
-    vi.mocked(disableOrgAdmin).mockRejectedValue(new NotFoundError("User 'user-sub-123' not found"));
+    vi.mocked(deleteOrgAdmin).mockRejectedValue(new NotFoundError("User 'user-sub-123' not found"));
     const result = (await handler(
       buildApiGwEvent({
         method: 'DELETE',
@@ -243,7 +246,7 @@ describe('DELETE /web-admin/organizations/{orgId}/org-admins/{userId} — disabl
   });
 
   it('returns 500 when service throws an unexpected error', async () => {
-    vi.mocked(disableOrgAdmin).mockRejectedValue(new Error('Cognito failure'));
+    vi.mocked(deleteOrgAdmin).mockRejectedValue(new Error('Cognito failure'));
     const result = (await handler(
       buildApiGwEvent({
         method: 'DELETE',
