@@ -431,7 +431,7 @@ Outputs:
       Name: !Sub "${AWS::StackName}-UserPoolClientId"
 
   CognitoDomain:
-    Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+    Value: !Sub "${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
     Export:
       Name: !Sub "${AWS::StackName}-CognitoDomain"
 
