@@ -151,3 +151,7 @@ __pycache__/
 # OS/editor noise
 .DS_Store
 Thumbs.db
+
+# Robot Framework
+robot/results/
+robot/.venv/
