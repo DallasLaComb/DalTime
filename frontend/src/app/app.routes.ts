@@ -3,10 +3,20 @@ import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
-  // OIDC callback — public, renders while checkAuth() processes the authorization code
+  // Public auth pages
   {
-    path: 'sso',
-    loadComponent: () => import('./core/auth/callback.component').then((m) => m.CallbackComponent),
+    path: 'login',
+    loadComponent: () => import('./core/auth/login/login').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'change-password',
+    loadComponent: () =>
+      import('./core/auth/change-password/change-password').then((m) => m.ChangePasswordComponent),
+  },
+  {
+    path: 'forgot-password',
+    loadComponent: () =>
+      import('./core/auth/forgot-password/forgot-password').then((m) => m.ForgotPasswordComponent),
   },
 
   // Unauthorized — public, shows access denied with role info
@@ -22,9 +32,7 @@ export const routes: Routes = [
     canMatch: [authGuard, roleGuard],
     data: { roles: ['WebAdmin'] as const },
     loadComponent: () =>
-      import('./features/web-admin/org-admins/org-admins').then(
-        (m) => m.OrgAdminsComponent,
-      ),
+      import('./features/web-admin/org-admins/org-admins').then((m) => m.OrgAdminsComponent),
   },
   {
     path: 'web-admin/organizations',

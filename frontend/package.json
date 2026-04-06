@@ -30,7 +30,6 @@
     "@angular/platform-browser": "^21.2.6",
     "@angular/router": "^21.2.6",
     "@aws-sdk/client-cognito-identity-provider": "^3.991.0",
-    "angular-auth-oidc-client": "^21.0.1",
     "bootstrap": "^5.3.8",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"

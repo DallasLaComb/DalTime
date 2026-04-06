@@ -9,6 +9,5 @@ import { AuthService } from '../../../core/auth/auth';
 })
 export class WebAdminDashboard {
   protected readonly authService = inject(AuthService);
-  protected readonly user = this.authService.userSignal;
   protected readonly role = this.authService.roleSignal;
 }
