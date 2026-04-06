@@ -17,7 +17,7 @@ export class OrgAdminsService {
     return this.http.post<OrgAdminUserResponse>(`${this.baseUrl}/${orgId}/org-admins`, body);
   }
 
-  disable(orgId: string, userId: string): Observable<void> {
+  delete(orgId: string, userId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${orgId}/org-admins/${userId}`);
   }
 }
