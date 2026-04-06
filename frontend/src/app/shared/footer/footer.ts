@@ -2,10 +2,12 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 @Component({
-  selector: 'app-home',
+  selector: 'app-footer',
   imports: [RouterLink],
-  templateUrl: './home.html',
-  styleUrl: './home.css',
+  templateUrl: './footer.html',
+  styleUrl: './footer.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class HomeComponent {}
+export class Footer {
+  readonly year = new Date().getFullYear();
+}

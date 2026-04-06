@@ -44,9 +44,8 @@ export class Navbar {
   }
 
   protected confirmSignOut(): void {
-    this.signingOut.set(true);
-    this.closeMenu();
     this.showSignOutModal.set(false);
+    this.signingOut.set(false);
     this.authService.logout();
   }
 }

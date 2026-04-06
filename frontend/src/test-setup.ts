@@ -1,4 +1,4 @@
-import { EnvironmentProviders, Provider } from '@angular/core';
+import { EnvironmentProviders, Provider, signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { AuthService } from './app/core/auth/auth';
 
@@ -8,7 +8,7 @@ const mockAuthService = {
   authReady: () => true,
   accessToken: null,
   idToken: null,
-  orgId: null,
+  orgId: signal(null),
   hasPendingChallenge: false,
   initialize: () => {},
   login: async () => ({ success: false }),
