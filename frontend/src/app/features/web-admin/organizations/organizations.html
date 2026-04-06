@@ -21,11 +21,7 @@
   @if (error()) {
     <div class="alert alert-danger d-flex flex-column flex-sm-row align-items-sm-center gap-2" role="alert" data-testid="error-alert">
       <span class="flex-grow-1">{{ error() }}</span>
-      <button
-        class="btn btn-sm btn-outline-danger"
-        data-testid="retry-btn"
-        (click)="loadOrganizations()"
-      >
+      <button class="btn btn-sm btn-outline-danger" data-testid="retry-btn" (click)="loadOrganizations()">
         Retry
       </button>
     </div>
@@ -43,38 +39,35 @@
 
     } @else {
 
-      <!-- Mobile / Tablet: Card List (hidden on lg+) -->
+      <!-- Mobile / Tablet: Card List -->
       <div class="d-lg-none" data-testid="org-table">
         @for (org of organizations(); track org.org_id) {
           <div class="card mb-3 shadow-sm" data-testid="org-row">
             <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="d-flex justify-content-between align-items-start mb-1">
                 <h6 class="card-title mb-0 fw-semibold" data-testid="org-name">{{ org.name }}</h6>
                 <small class="text-muted ms-2 text-nowrap">{{ org.created_at | date: 'mediumDate' }}</small>
               </div>
               <p class="card-text text-muted mb-2" data-testid="org-address">{{ org.address }}</p>
-              <div class="d-flex gap-2">
-                <button
-                  class="btn btn-sm btn-outline-secondary flex-fill"
-                  data-testid="edit-org-btn"
-                  (click)="openEditModal(org)"
-                >
-                  Edit
-                </button>
-                <button
-                  class="btn btn-sm btn-outline-danger flex-fill"
-                  data-testid="delete-org-btn"
-                  (click)="openDeleteModal(org)"
-                >
-                  Delete
-                </button>
+              <div class="mb-3">
+                <span
+                  class="badge"
+                  [class.bg-primary]="org.org_admin_count > 0"
+                  [class.bg-secondary]="org.org_admin_count === 0"
+                  data-testid="admin-count-badge"
+                >{{ org.org_admin_count }} Admin{{ org.org_admin_count !== 1 ? 's' : '' }}</span>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-sm btn-outline-secondary flex-fill" data-testid="edit-org-btn" (click)="openEditModal(org)">Edit</button>
+                <button class="btn btn-sm btn-dark flex-fill" data-testid="manage-admins-btn" (click)="manageAdmins(org)">Manage Admins</button>
+                <button class="btn btn-sm btn-outline-danger flex-fill" data-testid="delete-org-btn" (click)="openDeleteModal(org)">Delete</button>
               </div>
             </div>
           </div>
         }
       </div>
 
-      <!-- Laptop / PC: Table (hidden below lg) -->
+      <!-- Laptop / PC: Table -->
       <div class="d-none d-lg-block">
         <div class="table-responsive">
           <table class="table table-hover align-middle">
@@ -83,6 +76,7 @@
                 <th class="d-none d-xl-table-cell">ID</th>
                 <th>Name</th>
                 <th>Address</th>
+                <th>Org Admins</th>
                 <th>Created</th>
                 <th class="text-end">Actions</th>
               </tr>
@@ -93,22 +87,19 @@
                   <td class="text-muted d-none d-xl-table-cell"><code>{{ org.org_id }}</code></td>
                   <td class="fw-semibold" data-testid="org-name">{{ org.name }}</td>
                   <td data-testid="org-address">{{ org.address }}</td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.bg-primary]="org.org_admin_count > 0"
+                      [class.bg-secondary]="org.org_admin_count === 0"
+                      data-testid="admin-count-badge"
+                    >{{ org.org_admin_count }}</span>
+                  </td>
                   <td class="text-muted">{{ org.created_at | date: 'mediumDate' }}</td>
                   <td class="text-end">
-                    <button
-                      class="btn btn-sm btn-outline-secondary me-1"
-                      data-testid="edit-org-btn"
-                      (click)="openEditModal(org)"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      class="btn btn-sm btn-outline-danger"
-                      data-testid="delete-org-btn"
-                      (click)="openDeleteModal(org)"
-                    >
-                      Delete
-                    </button>
+                    <button class="btn btn-sm btn-outline-secondary me-1" data-testid="edit-org-btn" (click)="openEditModal(org)">Edit</button>
+                    <button class="btn btn-sm btn-dark me-1" data-testid="manage-admins-btn" (click)="manageAdmins(org)">Manage Admins</button>
+                    <button class="btn btn-sm btn-outline-danger" data-testid="delete-org-btn" (click)="openDeleteModal(org)">Delete</button>
                   </td>
                 </tr>
               }
@@ -124,75 +115,33 @@
 <!-- Create / Edit Modal -->
 @if (showModal()) {
   <div class="modal-backdrop fade show"></div>
-  <div
-    class="modal d-block fade show"
-    tabindex="-1"
-    data-testid="org-modal"
-    (click)="closeModal()"
-  >
+  <div class="modal d-block fade show" tabindex="-1" data-testid="org-modal" (click)="closeModal()">
     <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" data-testid="modal-title">
             {{ editingOrg() ? 'Edit Organization' : 'Create Organization' }}
           </h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-testid="close-modal-btn"
-            (click)="closeModal()"
-          ></button>
+          <button type="button" class="btn-close" data-testid="close-modal-btn" (click)="closeModal()"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
             <label for="orgName" class="form-label">Name</label>
-            <input
-              type="text"
-              class="form-control form-control-lg"
-              id="orgName"
-              data-testid="org-name-input"
-              [value]="formName()"
-              (input)="formName.set($any($event.target).value)"
-              placeholder="Organization name"
-              autocomplete="organization"
-            />
+            <input type="text" class="form-control form-control-lg" id="orgName" data-testid="org-name-input"
+              [value]="formName()" (input)="formName.set($any($event.target).value)" placeholder="Organization name" autocomplete="organization" />
           </div>
           <div class="mb-3">
             <label for="orgAddress" class="form-label">Address</label>
-            <input
-              type="text"
-              class="form-control form-control-lg"
-              id="orgAddress"
-              data-testid="org-address-input"
-              [value]="formAddress()"
-              (input)="formAddress.set($any($event.target).value)"
-              placeholder="123 Main St, City, State"
-              autocomplete="street-address"
-            />
+            <input type="text" class="form-control form-control-lg" id="orgAddress" data-testid="org-address-input"
+              [value]="formAddress()" (input)="formAddress.set($any($event.target).value)" placeholder="123 Main St, City, State" autocomplete="street-address" />
           </div>
         </div>
         <div class="modal-footer flex-column flex-sm-row">
-          <button
-            type="button"
-            class="btn btn-outline-secondary w-100 w-sm-auto"
-            data-testid="cancel-modal-btn"
-            (click)="closeModal()"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            class="btn btn-dark w-100 w-sm-auto"
-            data-testid="save-org-btn"
-            [disabled]="saving() || !formName().trim() || !formAddress().trim()"
-            (click)="saveOrganization()"
-          >
+          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-modal-btn" (click)="closeModal()">Cancel</button>
+          <button type="button" class="btn btn-dark w-100 w-sm-auto" data-testid="save-org-btn"
+            [disabled]="saving() || !formName().trim() || !formAddress().trim()" (click)="saveOrganization()">
             @if (saving()) {
-              <span
-                class="spinner-border spinner-border-sm me-1"
-                data-testid="save-spinner"
-                role="status"
-              ></span>
+              <span class="spinner-border spinner-border-sm me-1" data-testid="save-spinner" role="status"></span>
             }
             {{ editingOrg() ? 'Save Changes' : 'Create' }}
           </button>
@@ -205,52 +154,27 @@
 <!-- Delete Confirmation Modal -->
 @if (showDeleteModal()) {
   <div class="modal-backdrop fade show"></div>
-  <div
-    class="modal d-block fade show"
-    tabindex="-1"
-    data-testid="delete-modal"
-    (click)="closeDeleteModal()"
-  >
+  <div class="modal d-block fade show" tabindex="-1" data-testid="delete-modal" (click)="closeDeleteModal()">
     <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Delete Organization</h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-testid="close-delete-modal-btn"
-            (click)="closeDeleteModal()"
-          ></button>
+          <button type="button" class="btn-close" data-testid="close-delete-modal-btn" (click)="closeDeleteModal()"></button>
         </div>
         <div class="modal-body">
-          <p>
-            Are you sure you want to delete
-            <strong data-testid="delete-org-name">{{ deletingOrg()?.name }}</strong>?
-          </p>
+          <p>Are you sure you want to delete <strong data-testid="delete-org-name">{{ deletingOrg()?.name }}</strong>?</p>
+          @if ((deletingOrg()?.org_admin_count ?? 0) > 0) {
+            <div class="alert alert-warning py-2" data-testid="delete-admin-warning">
+              This organization has active admins. Deleting it will not remove their Cognito accounts.
+            </div>
+          }
           <p class="text-muted mb-0">This action cannot be undone.</p>
         </div>
         <div class="modal-footer flex-column flex-sm-row">
-          <button
-            type="button"
-            class="btn btn-outline-secondary w-100 w-sm-auto"
-            data-testid="cancel-delete-btn"
-            (click)="closeDeleteModal()"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            class="btn btn-danger w-100 w-sm-auto"
-            data-testid="confirm-delete-btn"
-            [disabled]="saving()"
-            (click)="confirmDelete()"
-          >
+          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-delete-btn" (click)="closeDeleteModal()">Cancel</button>
+          <button type="button" class="btn btn-danger w-100 w-sm-auto" data-testid="confirm-delete-btn" [disabled]="saving()" (click)="confirmDelete()">
             @if (saving()) {
-              <span
-                class="spinner-border spinner-border-sm me-1"
-                data-testid="delete-spinner"
-                role="status"
-              ></span>
+              <span class="spinner-border spinner-border-sm me-1" data-testid="delete-spinner" role="status"></span>
             }
             Delete
           </button>

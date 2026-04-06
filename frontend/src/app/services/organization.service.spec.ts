@@ -13,7 +13,7 @@ const mockOrg = {
   address: '123 Main St',
   created_at: '2025-01-01T00:00:00.000Z',
   updated_at: '2025-01-01T00:00:00.000Z',
-  org_admin_ids: [],
+  org_admin_count: 0,
 };
 
 describe('OrganizationService', () => {

@@ -38,9 +38,9 @@ interface OrganizationResponse {
   org_id: string;
   name: string;
   address: string;
-  created_at: string;      // ISO 8601
-  updated_at: string;      // ISO 8601
-  org_admin_ids: string[]; // IDs of OrgAdmin users assigned to this org
+  created_at: string;       // ISO 8601
+  updated_at: string;       // ISO 8601
+  org_admin_count: number;  // maintained atomically by the org-admins Lambda
 }
 
 // GET /organizations → OrganizationResponse[]
@@ -56,7 +56,7 @@ interface OrganizationResponse {
 2. `address` is required on create and must be non-empty after trimming.
 3. `org_id` is server-generated (`randomUUID()`) — never accepted from the client.
 4. `created_at` and `updated_at` are server-generated ISO 8601 timestamps.
-5. `org_admin_ids` is initialized as an empty array on create; it is managed by a separate future endpoint (not writable via POST/PUT on this feature).
+5. `org_admin_count` is initialized to `0` on create. It is incremented and decremented atomically by the org-admins Lambda — never written by this handler directly.
 6. On `PUT`, only `name` and `address` are updatable. Fields omitted from the body retain their existing values.
 7. `PUT` and `DELETE` on an unknown `orgId` return 404.
 8. Whitespace-only strings for `name` or `address` are treated as empty and return 400.
@@ -106,6 +106,6 @@ The `GSI1` index allows listing all organizations sorted by creation time withou
 
 ## Known Gaps (to address)
 
-- [ ] **No unit tests** — `backend/test/unit/web-admin/organizations/handler.test.ts` does not exist
-- [ ] **Auth not enforced** — SAM template routes use `Authorizer: NONE`; must switch to `CognitoJwtAuthorizer` and enforce `WebAdmin` group
-- [ ] **`org_admin_ids` unmanaged** — the field exists on the model but no endpoint reads or writes it; a future "assign org admin" endpoint will own this
+- [x] ~~No unit tests~~ — added in gap-fill pass
+- [x] ~~Auth not enforced~~ — fixed in gap-fill pass
+- [x] ~~`org_admin_ids` unmanaged~~ — replaced by `org_admin_count` (atomic counter) + org-scoped org-admins management feature

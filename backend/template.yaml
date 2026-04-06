@@ -71,6 +71,12 @@ Resources:
           ]
         }
 
+  OrgAdminsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-OrgAdminsFunction"
+      RetentionInDays: 1
+
   OrganizationsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -143,6 +149,77 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+
+  OrgAdminsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrgAdminsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-OrgAdminsFunction"
+      LoggingConfig:
+        LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrgAdminsFunction"
+      CodeUri: .
+      Handler: src/functions/web-admin/org-admins/handler.handler
+      Events:
+        ListOrgAdmins:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateOrgAdmin:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        DisableOrgAdmin:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins/{userId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdmins:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsOrgAdminById:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins/{userId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DalTimeTable
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminDisableUser
+              Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/org-admins/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: "es2022"
+        Sourcemap: true
+        External:
+          - "@aws-sdk/*"
 
   OrganizationsFunction:
     Type: AWS::Serverless::Function
