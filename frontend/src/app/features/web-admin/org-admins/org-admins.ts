@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgClass } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { OrgAdminsService } from '../../../services/org-admins.service';
@@ -8,7 +8,7 @@ import type { OrgAdminUserResponse } from '../../../core/models/org-admin-user.m
 
 @Component({
   selector: 'app-org-admins',
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, NgClass, RouterLink],
   templateUrl: './org-admins.html',
   styleUrl: './org-admins.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

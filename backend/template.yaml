@@ -19,6 +19,17 @@ Parameters:
     AllowedValues:
       - arm64
       - x86_64
+  DynamoDbEndpoint:
+    Type: String
+    Default: ""
+    Description: "DynamoDB endpoint override for local development"
+  TableName:
+    Type: String
+    Default: ""
+    Description: "DynamoDB table name override for local development"
+
+Conditions:
+  UseTableNameOverride: !Not [!Equals [!Ref TableName, ""]]
 
 Globals:
   Function:
@@ -30,6 +41,11 @@ Globals:
       Variables:
         NODE_ENV: development
         ALLOWED_ORIGIN: !Ref AllowedOrigin
+        DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
+        TABLE_NAME: !If
+          - UseTableNameOverride
+          - !Ref TableName
+          - !Ref DalTimeTable
 
 Resources:
 
@@ -196,7 +212,6 @@ Resources:
               Authorizer: NONE
       Environment:
         Variables:
-          TABLE_NAME: !Ref DalTimeTable
           USER_POOL_ID: !Ref CognitoUserPoolId
       Policies:
         - DynamoDBCrudPolicy:
@@ -277,10 +292,6 @@ Resources:
             ApiId: !Ref DalTimeHttpApi
             Auth:
               Authorizer: NONE
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref DalTimeTable
-          DYNAMODB_ENDPOINT: ""
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref DalTimeTable
