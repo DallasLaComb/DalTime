@@ -1,5 +1,5 @@
 # Runs Robot Framework E2E tests against the deployed environment
-# Triggers after a successful Build & Deploy workflow
+# Triggers after a successful CD workflow
 name: E2E Tests
 
 on:
@@ -15,16 +15,19 @@ jobs:
   e2e:
     name: Robot Framework E2E (${{ github.event.workflow_run.head_branch }})
     runs-on: ubuntu-latest
-    # Only run if the deploy succeeded (skip on failure or cancellation)
     if: github.event.workflow_run.conclusion == 'success'
+
+    environment: ${{ github.event.workflow_run.head_branch }}
+
+    env:
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.2.0
+        uses: actions/checkout@v6.0.2
         with:
           ref: ${{ github.event.workflow_run.head_branch }}
 
-      # Install Python and Robot Framework dependencies
       - name: Setup Python
         uses: actions/setup-python@v5.2.0
         with:
@@ -32,20 +35,40 @@ jobs:
 
       - name: Install Robot Framework
         run: |
-          pip install robotframework robotframework-browser
+          pip install -r robot/requirements.txt
           rfbrowser init
 
-      # Run the E2E test suites from the robot/ directory
+      - name: Resolve environment variables
+        id: env
+        run: |
+          case "$BRANCH" in
+            dev)
+              echo "base_url=https://dev.daltime.com" >> "$GITHUB_OUTPUT"
+              echo "web_admin_email=robot-dev@daltime.com" >> "$GITHUB_OUTPUT"
+              echo "cognito_client_id=1nl13tbaqb47s8f0tfc07lc24m" >> "$GITHUB_OUTPUT"
+              ;;
+            qa)
+              echo "base_url=https://qa.daltime.com" >> "$GITHUB_OUTPUT"
+              echo "web_admin_email=robot-qa@daltime.com" >> "$GITHUB_OUTPUT"
+              echo "cognito_client_id=4vqid36i5ggs8vreaeitsgiqj5" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
       - name: Run E2E tests
         run: |
           robot \
             --outputdir results \
-            --variable ENV:${{ github.event.workflow_run.head_branch }} \
-            robot/
+            --variable BASE_URL:${{ steps.env.outputs.base_url }} \
+            --variable WEB_ADMIN_EMAIL:${{ steps.env.outputs.web_admin_email }} \
+            --variable WEB_ADMIN_PASSWORD:${{ secrets.E2E_WEB_ADMIN_PASSWORD }} \
+            --variable COGNITO_REGION:us-east-1 \
+            --variable COGNITO_CLIENT_ID:${{ steps.env.outputs.cognito_client_id }} \
+            --variable HEADLESS:true \
+            --variable SLOW_MO:0ms \
+            robot/tests/
         env:
           BROWSER: chromium
 
-      # Upload test results as an artifact even if tests fail
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4.4.0
