@@ -93,6 +93,12 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-OrgAdminsFunction"
       RetentionInDays: 1
 
+  ManagersFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-ManagersFunction"
+      RetentionInDays: 1
+
   OrganizationsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -173,7 +179,7 @@ Resources:
       FunctionName: !Sub "${AWS::StackName}-OrgAdminsFunction"
       LoggingConfig:
         LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrgAdminsFunction"
-      CodeUri: .
+      CodeUri: ../backend
       Handler: src/functions/web-admin/org-admins/handler.handler
       Events:
         ListOrgAdmins:
@@ -237,6 +243,84 @@ Resources:
         External:
           - "@aws-sdk/*"
 
+  ManagersFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagersFunctionLogGroup
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-ManagersFunction"
+      LoggingConfig:
+        LogGroup: !Sub "/aws/lambda/${AWS::StackName}-ManagersFunction"
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/managers/handler.handler
+      Events:
+        ListManagers:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateManager:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        UpdateManager:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DisableManager:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagers:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerById:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+          LOCAL_USER_SUB: ""
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminDisableUser
+                - cognito-idp:AdminGetUser
+              Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/managers/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: "es2022"
+        Sourcemap: true
+        External:
+          - "@aws-sdk/*"
+
   OrganizationsFunction:
     Type: AWS::Serverless::Function
     DependsOn: OrganizationsFunctionLogGroup
@@ -244,7 +328,7 @@ Resources:
       FunctionName: !Sub "${AWS::StackName}-OrganizationsFunction"
       LoggingConfig:
         LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
-      CodeUri: .
+      CodeUri: ../backend
       Handler: src/functions/web-admin/organizations/handler.handler
       Events:
         ListOrganizations:
