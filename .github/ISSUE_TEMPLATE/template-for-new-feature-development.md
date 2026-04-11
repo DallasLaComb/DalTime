@@ -1,6 +1,6 @@
 ---
 name: New Feature Development
-description: Template for planning and tracking a new feature
+about: Template for planning and tracking a new feature
 title: "[FEATURE] "
 labels: ["feature"]
 ---
