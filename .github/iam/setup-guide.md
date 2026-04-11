@@ -22,12 +22,12 @@ This only needs to be done once per AWS account.
 2. Trusted entity type: **Web identity**
 3. Identity provider: select the OIDC provider from step 1
 4. Audience: `sts.amazonaws.com`
-5. Attach the inline policy from `github-actions-policy.json`
+5. Attach the inline policy from `github-actions-policy.json` (see `github-actions-policy.blueprint.json` for a ready-made example)
 6. Name the role: `github-actions-daltime-dev`, `github-actions-daltime-qa`, or `github-actions-daltime-main`
 
 ### 3. Scope the Trust Policy
 
-Use `trust-policy.json` as the trust relationship, substituting values for the target environment:
+Use `trust-policy.json` as the trust relationship, substituting values for the target environment (see `trust-policy.blueprint.json` for a ready-made example):
 
 ```bash
 sed -e 's/{{ACCOUNT_ID}}/123456789012/g' \

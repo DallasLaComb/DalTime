@@ -41,15 +41,15 @@ Then attach VS Code — add to `.vscode/launch.json`:
 ```
 Set breakpoints in Lambda handlers and step through.
 
-### Jest Test Debugging
+### Vitest Debugging
 Add to `.vscode/launch.json`:
 ```json
 {
   "type": "node",
   "request": "launch",
-  "name": "Debug Jest",
-  "program": "${workspaceFolder}/backend/node_modules/.bin/jest",
-  "args": ["--runInBand", "${relativeFile}"],
+  "name": "Debug Vitest",
+  "program": "${workspaceFolder}/backend/node_modules/.bin/vitest",
+  "args": ["run", "--no-file-parallelism", "${relativeFile}"],
   "cwd": "${workspaceFolder}/backend"
 }
 ```
@@ -60,4 +60,4 @@ Open a test file, run this config, and breakpoints in both tests and source code
 ## Tips
 - **Frontend**: Browser DevTools is fastest for most issues. Use VS Code debugger for complex state.
 - **Backend**: `console.log` in Lambda handlers prints to the `sam local` terminal. Use the debug port for stepping through tricky logic.
-- **Tests**: Use the Jest debug config when a test fails and logs aren't enough.
+- **Tests**: Use the Vitest debug config when a test fails and logs aren't enough.

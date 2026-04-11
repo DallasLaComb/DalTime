@@ -1,21 +1,21 @@
-Audit an existing implementation against its spec document.
+Audit an existing implementation against its blueprint.
 
 **Usage:** Provide the argument as `<role>/<feature-name>` after referencing this prompt.
 
-**Example:** `@spec-review web-admin/organizations`
+**Example:** `@blueprint-review web-admin/organizations`
 
 ---
 
-You are auditing an existing DalTime feature against its spec. The feature is specified in my message.
+You are auditing an existing DalTime feature against its blueprint. The feature is specified in my message.
 
 Parse the argument as `<role>/<feature-name>`.
 
 ## What to Review
 
-### 1. Locate the Spec
-Read `specs/lambda/<role>/<feature-name>.spec.md` OR `specs/component/<role>/<feature-name>.spec.md` (check both).
+### 1. Locate the Blueprint
+Read `backend/src/functions/<role>/<feature-name>/0-<feature-name>.blueprint.md` OR `frontend/src/app/features/<role>/<feature-name>/0-<feature-name>.blueprint.md` (check both).
 
-If no spec exists, **stop and report** — the feature is missing its spec. Do not proceed with a review; instead ask me if I want to use `@new-lambda` or `@new-component` to create a retroactive spec.
+If no blueprint exists, **stop and report** — the feature is missing its blueprint. Do not proceed with a review; instead ask me if I want to use `@new-lambda` or `@new-component` to create a retroactive blueprint.
 
 ### 2. Read the Implementation
 
@@ -40,9 +40,9 @@ Output a structured gap report with these sections:
 
 ---
 
-#### Spec Compliance
+#### Blueprint Compliance
 
-For each item in the spec, mark one of:
+For each item in the blueprint, mark one of:
 - ✅ Implemented correctly
 - ⚠️ Partially implemented (describe what's missing)
 - ❌ Not implemented
@@ -50,13 +50,13 @@ For each item in the spec, mark one of:
 Cover:
 - API routes (correct method, path, auth)
 - Request validation (all business rules enforced)
-- Response shapes (match spec interfaces)
-- DynamoDB key format (PK/SK/GSI match spec design)
+- Response shapes (match blueprint interfaces)
+- DynamoDB key format (PK/SK/GSI match blueprint design)
 - Error handling (400/403/404/500 paths exist)
 
 #### Test Coverage Gaps
 
-Compare the spec's test matrix against the actual test file. For each test row:
+Compare the blueprint's test matrix against the actual test file. For each test row:
 - ✅ Test exists and covers the case
 - ⚠️ Test exists but is incomplete or uses wrong assertion style
 - ❌ Test missing entirely

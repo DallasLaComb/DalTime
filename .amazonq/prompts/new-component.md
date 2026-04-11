@@ -1,4 +1,4 @@
-Spec-driven workflow for a new Angular feature (component + service + model + tests).
+Blueprint-driven workflow for a new Angular feature (component + service + model + tests).
 
 **Usage:** Provide the argument as `<role>/<feature-name>` after referencing this prompt.
 
@@ -6,13 +6,13 @@ Spec-driven workflow for a new Angular feature (component + service + model + te
 
 ---
 
-You are implementing a new Angular feature for DalTime using spec-driven development. The feature is specified in my message.
+You are implementing a new Angular feature for DalTime using blueprint-driven development. The feature is specified in my message.
 
 Parse the argument as `<role>/<feature-name>`. Valid roles: `web-admin`, `org-admin`, `manager`, `employee`.
 
-## Step 1 — Write the Spec (do this first, do NOT write implementation code yet)
+## Step 1 — Write the Blueprint (do this first, do NOT write implementation code yet)
 
-Create the file `specs/component/<role>/<feature-name>.spec.md` with this structure:
+Create the file `frontend/src/app/features/<role>/<feature-name>/0-<feature-name>.blueprint.md` with this structure:
 
 ```markdown
 # Spec: <Feature Name> Component
@@ -60,11 +60,11 @@ Numbered list of field-level and form-level validation rules.
 | Employee | redirect to /unauthorized |
 ```
 
-After writing the spec, **stop and ask me to review it** before continuing to Step 2.
+After writing the blueprint, **stop and ask me to review it** before continuing to Step 2.
 
 ---
 
-## Step 2 — Implement (only after I approve the spec)
+## Step 2 — Implement (only after I approve the blueprint)
 
 Implement in this exact order. Check what already exists before creating files.
 
@@ -107,7 +107,7 @@ Follow these rules strictly:
 - Use Angular Testing Library (`@testing-library/angular`)
 - Query by `role`, `label`, or `data-testid` — never by CSS class or component ref
 - Mock the service with `vi.fn()` / `jest.fn()` in `TestBed`
-- Cover every row in the spec's component test matrix
+- Cover every row in the blueprint's component test matrix
 - Required tests: loading state, success state, empty state, error state
 - Form tests: valid submit calls service, invalid submit shows errors, API not called
 
