@@ -22,22 +22,22 @@ import {
 const cognitoClient = new CognitoIdentityProviderClient({});
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
-  const { routeKey, pathParameters } = event;
-  const orgId = pathParameters?.orgId;
-  const userId = pathParameters?.userId;
+  const method = event.requestContext.http.method;
+  const orgId = event.pathParameters?.orgId;
+  const userId = event.pathParameters?.userId;
 
-  if (event.requestContext.http.method === 'OPTIONS') {
+  if (method === 'OPTIONS') {
     return ok('');
   }
 
   if (!orgId) return badRequest('orgId path parameter is required');
 
   try {
-    if (routeKey === 'GET /web-admin/organizations/{orgId}/org-admins') {
+    if (method === 'GET') {
       return ok(await listOrgAdmins(orgId, cognitoClient));
     }
 
-    if (routeKey === 'POST /web-admin/organizations/{orgId}/org-admins') {
+    if (method === 'POST') {
       if (!event.body) return badRequest('Request body is required');
       let body: CreateOrgAdminBody;
       try {
@@ -48,13 +48,13 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
       return created(await createOrgAdmin(orgId, body, cognitoClient));
     }
 
-    if (routeKey === 'DELETE /web-admin/organizations/{orgId}/org-admins/{userId}') {
+    if (method === 'DELETE') {
       if (!userId) return badRequest('userId path parameter is required');
       await deleteOrgAdmin(orgId, userId, cognitoClient);
       return noContent();
     }
 
-    return badRequest(`Unhandled route: ${routeKey}`);
+    return badRequest(`Unhandled route: ${method} ${event.rawPath}`);
   } catch (err) {
     if (err instanceof ValidationError) return badRequest((err as Error).message);
     if (err instanceof ConflictError) return conflict((err as Error).message);

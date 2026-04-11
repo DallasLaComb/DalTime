@@ -14,21 +14,19 @@ import {
 import { ValidationError, listOrganizations, getOrganization, createOrganization, updateOrganization, deleteOrganization } from './service.js';
 
 export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) => {
-  const routeKey = event.routeKey;
+  const method = event.requestContext.http.method;
   const orgId = event.pathParameters?.orgId;
 
-  console.log('routeKey:', routeKey, '| orgId:', orgId);
-
-  if (event.requestContext.http.method === 'OPTIONS') {
+  if (method === 'OPTIONS') {
     return ok('');
   }
 
   try {
-    if (routeKey === 'GET /organizations') {
+    if (method === 'GET' && !orgId) {
       return ok(await listOrganizations());
     }
 
-    if (routeKey === 'POST /organizations') {
+    if (method === 'POST' && !orgId) {
       if (!event.body) return badRequest('Request body is required');
       let body: CreateOrganizationBody;
       try {
@@ -39,14 +37,12 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
       return created(await createOrganization(body));
     }
 
-    if (routeKey === 'GET /organizations/{orgId}') {
-      if (!orgId) return badRequest('orgId path parameter is required');
+    if (method === 'GET' && orgId) {
       const org = await getOrganization(orgId);
       return org ? ok(org) : notFound(`Organization '${orgId}' not found`);
     }
 
-    if (routeKey === 'PUT /organizations/{orgId}') {
-      if (!orgId) return badRequest('orgId path parameter is required');
+    if (method === 'PUT' && orgId) {
       if (!event.body) return badRequest('Request body is required');
       let body: UpdateOrganizationBody;
       try {
@@ -58,13 +54,12 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
       return org ? ok(org) : notFound(`Organization '${orgId}' not found`);
     }
 
-    if (routeKey === 'DELETE /organizations/{orgId}') {
-      if (!orgId) return badRequest('orgId path parameter is required');
+    if (method === 'DELETE' && orgId) {
       const deleted = await deleteOrganization(orgId);
       return deleted ? noContent() : notFound(`Organization '${orgId}' not found`);
     }
 
-    return badRequest(`Unhandled route: ${routeKey}`);
+    return badRequest(`Unhandled route: ${method} ${event.rawPath}`);
   } catch (error) {
     if (error instanceof ValidationError) {
       return badRequest(error.message);

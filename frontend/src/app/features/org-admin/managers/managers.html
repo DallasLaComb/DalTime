@@ -1,0 +1,271 @@
+<div class="container-fluid py-3 py-md-4">
+
+  <!-- Page Header -->
+  <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2 mb-4">
+    <h2 class="mb-0" data-testid="page-heading">Managers</h2>
+    <button class="btn btn-dark w-100 w-sm-auto" data-testid="register-btn" (click)="openRegisterModal()">
+      + Register Manager
+    </button>
+  </div>
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="text-center py-5" data-testid="loading-spinner">
+      <div class="spinner-border text-secondary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  }
+
+  <!-- Error -->
+  @if (error()) {
+    <div class="alert alert-danger d-flex flex-column flex-sm-row align-items-sm-center gap-2" role="alert" data-testid="error-alert">
+      <span class="flex-grow-1">{{ error() }}</span>
+      <button class="btn btn-sm btn-outline-danger" data-testid="retry-btn" (click)="load()">Retry</button>
+    </div>
+  }
+
+  <!-- Content -->
+  @if (!loading() && !error()) {
+    @if (managers().length === 0) {
+
+      <!-- Empty State -->
+      <div class="text-center py-5 text-muted" data-testid="empty-state">
+        <p class="fs-5 mb-1">No managers registered yet</p>
+        <p>Register a manager to get started with scheduling.</p>
+      </div>
+
+    } @else {
+
+      <!-- Mobile / Tablet: Card List -->
+      <div class="d-lg-none" data-testid="manager-list">
+        @for (manager of managers(); track manager.manager_id) {
+          <div class="card mb-3 shadow-sm" data-testid="manager-row">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <h6 class="card-title mb-0 fw-semibold" data-testid="manager-name">{{ manager.first_name }} {{ manager.last_name }}</h6>
+                <span class="badge ms-2" [ngClass]="statusClass(manager.status)" data-testid="status-badge">{{ statusLabel(manager.status) }}</span>
+              </div>
+              <p class="card-text text-muted mb-1" data-testid="manager-email">{{ manager.email }}</p>
+              @if (manager.phone) {
+                <p class="card-text text-muted mb-1" data-testid="manager-phone">{{ manager.phone }}</p>
+              }
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-muted">{{ manager.created_at | date: 'mediumDate' }}</small>
+                <small class="text-muted" data-testid="employee-count">{{ manager.employee_count }} employees</small>
+              </div>
+              @if (manager.status !== 'DISABLED') {
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-primary flex-fill" data-testid="edit-btn" (click)="openEditModal(manager)">Edit</button>
+                  <button class="btn btn-sm btn-outline-danger flex-fill" data-testid="disable-btn" (click)="openDisableModal(manager)">Disable</button>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Laptop / PC: Table -->
+      <div class="d-none d-lg-block">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Employees</th>
+                <th>Created</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (manager of managers(); track manager.manager_id) {
+                <tr data-testid="manager-row">
+                  <td class="fw-semibold" data-testid="manager-name">{{ manager.first_name }} {{ manager.last_name }}</td>
+                  <td data-testid="manager-email">{{ manager.email }}</td>
+                  <td data-testid="manager-phone">{{ manager.phone }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="statusClass(manager.status)" data-testid="status-badge">{{ statusLabel(manager.status) }}</span>
+                  </td>
+                  <td data-testid="employee-count">{{ manager.employee_count }}</td>
+                  <td class="text-muted">{{ manager.created_at | date: 'mediumDate' }}</td>
+                  <td class="text-end">
+                    @if (manager.status !== 'DISABLED') {
+                      <button class="btn btn-sm btn-outline-primary me-1" data-testid="edit-btn" (click)="openEditModal(manager)">Edit</button>
+                      <button class="btn btn-sm btn-outline-danger" data-testid="disable-btn" (click)="openDisableModal(manager)">Disable</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    }
+  }
+</div>
+
+<!-- Register Modal -->
+@if (showRegisterModal()) {
+  <div class="modal-backdrop fade show"></div>
+  <div class="modal d-block fade show" tabindex="-1" data-testid="register-modal" (click)="closeRegisterModal()">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Register Manager</h5>
+          <button type="button" class="btn-close" data-testid="close-register-modal-btn" (click)="closeRegisterModal()"></button>
+        </div>
+        <div class="modal-body">
+          @if (modalError()) {
+            <div class="alert alert-danger py-2" data-testid="modal-error">{{ modalError() }}</div>
+          }
+          <div class="mb-3">
+            <label for="mgrFirstName" class="form-label">First Name</label>
+            <input type="text" class="form-control form-control-lg" id="mgrFirstName" data-testid="first-name-input"
+              [class.is-invalid]="formSubmitted() && !formFirstName().trim()"
+              [value]="formFirstName()" (input)="formFirstName.set($any($event.target).value)" placeholder="First name" autocomplete="given-name" />
+            @if (formSubmitted() && !formFirstName().trim()) {
+              <div class="invalid-feedback" data-testid="first-name-error">First name is required</div>
+            }
+          </div>
+          <div class="mb-3">
+            <label for="mgrLastName" class="form-label">Last Name</label>
+            <input type="text" class="form-control form-control-lg" id="mgrLastName" data-testid="last-name-input"
+              [class.is-invalid]="formSubmitted() && !formLastName().trim()"
+              [value]="formLastName()" (input)="formLastName.set($any($event.target).value)" placeholder="Last name" autocomplete="family-name" />
+            @if (formSubmitted() && !formLastName().trim()) {
+              <div class="invalid-feedback" data-testid="last-name-error">Last name is required</div>
+            }
+          </div>
+          <div class="mb-3">
+            <label for="mgrEmail" class="form-label">Email</label>
+            <input type="email" class="form-control form-control-lg" id="mgrEmail" data-testid="email-input"
+              [class.is-invalid]="formSubmitted() && !formEmail().trim()"
+              [value]="formEmail()" (input)="formEmail.set($any($event.target).value)" placeholder="manager@example.com" autocomplete="email" />
+            @if (formSubmitted() && !formEmail().trim()) {
+              <div class="invalid-feedback" data-testid="email-error">Email is required</div>
+            }
+          </div>
+          <div class="mb-3">
+            <label for="mgrPhone" class="form-label">Phone <span class="text-muted">(optional)</span></label>
+            <input type="tel" class="form-control form-control-lg" id="mgrPhone" data-testid="phone-input"
+              [value]="formPhone()" (input)="formPhone.set($any($event.target).value)" placeholder="555-123-4567" autocomplete="tel" />
+          </div>
+          <div class="mb-3">
+            <label for="mgrPassword" class="form-label">Temporary Password</label>
+            <div class="input-group">
+              <input [type]="showPassword() ? 'text' : 'password'" class="form-control form-control-lg" id="mgrPassword" data-testid="password-input"
+                [class.is-invalid]="formSubmitted() && !formPassword().trim()"
+                [value]="formPassword()" (input)="formPassword.set($any($event.target).value)" placeholder="Temporary password" autocomplete="new-password" />
+              <button class="btn btn-outline-secondary" type="button" data-testid="toggle-password-btn" (click)="togglePassword()">
+                {{ showPassword() ? 'Hide' : 'Show' }}
+              </button>
+            </div>
+            @if (formSubmitted() && !formPassword().trim()) {
+              <div class="text-danger small mt-1" data-testid="password-error">Temporary password is required</div>
+            }
+          </div>
+        </div>
+        <div class="modal-footer flex-column flex-sm-row">
+          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-register-btn" (click)="closeRegisterModal()">Cancel</button>
+          <button type="button" class="btn btn-dark w-100 w-sm-auto" data-testid="save-register-btn"
+            [disabled]="saving()" (click)="register()">
+            @if (saving()) {
+              <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Register
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Edit Modal -->
+@if (showEditModal()) {
+  <div class="modal-backdrop fade show"></div>
+  <div class="modal d-block fade show" tabindex="-1" data-testid="edit-modal" (click)="closeEditModal()">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Manager</h5>
+          <button type="button" class="btn-close" data-testid="close-edit-modal-btn" (click)="closeEditModal()"></button>
+        </div>
+        <div class="modal-body">
+          @if (editError()) {
+            <div class="alert alert-danger py-2" data-testid="edit-modal-error">{{ editError() }}</div>
+          }
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control form-control-lg" data-testid="edit-email-display" [value]="editingManager()?.email" readonly disabled />
+          </div>
+          <div class="mb-3">
+            <label for="editFirstName" class="form-label">First Name</label>
+            <input type="text" class="form-control form-control-lg" id="editFirstName" data-testid="edit-first-name-input"
+              [class.is-invalid]="editSubmitted() && !editFirstName().trim()"
+              [value]="editFirstName()" (input)="editFirstName.set($any($event.target).value)" autocomplete="given-name" />
+            @if (editSubmitted() && !editFirstName().trim()) {
+              <div class="invalid-feedback" data-testid="edit-first-name-error">First name is required</div>
+            }
+          </div>
+          <div class="mb-3">
+            <label for="editLastName" class="form-label">Last Name</label>
+            <input type="text" class="form-control form-control-lg" id="editLastName" data-testid="edit-last-name-input"
+              [class.is-invalid]="editSubmitted() && !editLastName().trim()"
+              [value]="editLastName()" (input)="editLastName.set($any($event.target).value)" autocomplete="family-name" />
+            @if (editSubmitted() && !editLastName().trim()) {
+              <div class="invalid-feedback" data-testid="edit-last-name-error">Last name is required</div>
+            }
+          </div>
+          <div class="mb-3">
+            <label for="editPhone" class="form-label">Phone <span class="text-muted">(optional)</span></label>
+            <input type="tel" class="form-control form-control-lg" id="editPhone" data-testid="edit-phone-input"
+              [value]="editPhone()" (input)="editPhone.set($any($event.target).value)" autocomplete="tel" />
+          </div>
+        </div>
+        <div class="modal-footer flex-column flex-sm-row">
+          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-edit-btn" (click)="closeEditModal()">Cancel</button>
+          <button type="button" class="btn btn-dark w-100 w-sm-auto" data-testid="save-edit-btn"
+            [disabled]="saving()" (click)="saveEdit()">
+            @if (saving()) {
+              <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Disable Confirmation Modal -->
+@if (showDisableModal()) {
+  <div class="modal-backdrop fade show"></div>
+  <div class="modal d-block fade show" tabindex="-1" data-testid="disable-modal" (click)="closeDisableModal()">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Disable Manager</h5>
+          <button type="button" class="btn-close" data-testid="close-disable-modal-btn" (click)="closeDisableModal()"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to disable <strong data-testid="disable-manager-name">{{ disablingManager()?.first_name }} {{ disablingManager()?.last_name }}</strong>
+            (<span data-testid="disable-manager-email">{{ disablingManager()?.email }}</span>)?</p>
+          <p class="text-muted mb-0">This will prevent them from signing in. Their data is preserved.</p>
+        </div>
+        <div class="modal-footer flex-column flex-sm-row">
+          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-disable-btn" (click)="closeDisableModal()">Cancel</button>
+          <button type="button" class="btn btn-danger w-100 w-sm-auto" data-testid="confirm-disable-btn" [disabled]="saving()" (click)="confirmDisable()">
+            @if (saving()) {
+              <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Disable
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
