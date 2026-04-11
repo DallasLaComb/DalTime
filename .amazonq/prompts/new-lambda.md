@@ -1,4 +1,4 @@
-Spec-driven workflow for a new Lambda feature.
+Blueprint-driven workflow for a new Lambda feature.
 
 **Usage:** Provide the argument as `<role>/<feature-name>` after referencing this prompt.
 
@@ -6,13 +6,13 @@ Spec-driven workflow for a new Lambda feature.
 
 ---
 
-You are implementing a new Lambda feature for DalTime using spec-driven development. The feature is specified in my message.
+You are implementing a new Lambda feature for DalTime using blueprint-driven development. The feature is specified in my message.
 
 Parse the argument as `<role>/<feature-name>`. Valid roles: `web-admin`, `org-admin`, `manager`, `employee`.
 
-## Step 1 — Write the Spec (do this first, do NOT write implementation code yet)
+## Step 1 — Write the Blueprint (do this first, do NOT write implementation code yet)
 
-Create the file `specs/lambda/<role>/<feature-name>.spec.md` with this structure:
+Create the file `backend/src/functions/<role>/<feature-name>/0-<feature-name>.blueprint.md` with this structure:
 
 ```markdown
 # Spec: <Feature Name>
@@ -55,11 +55,11 @@ Numbered list of validation rules, constraints, and logic that must be enforced.
 | DynamoDB failure | GET /... | DynamoDB throws | 500 | |
 ```
 
-After writing the spec, **stop and ask me to review it** before continuing to Step 2.
+After writing the blueprint, **stop and ask me to review it** before continuing to Step 2.
 
 ---
 
-## Step 2 — Implement (only after I approve the spec)
+## Step 2 — Implement (only after I approve the blueprint)
 
 Implement in this exact order. Check what already exists before creating files.
 
@@ -104,7 +104,7 @@ Follow these rules strictly:
 - Use `vi.mock()` to mock the service module entirely
 - Create a `buildApiGwEvent(overrides)` factory at top of file
 - One `describe` block per route
-- Cover every row in the spec's test matrix
+- Cover every row in the blueprint's test matrix
 - Required tests per route: happy path, missing/invalid body (400), not found (404), service throws (500)
 - Assert on status codes AND parsed response body shape
 

@@ -10,7 +10,7 @@
 | Backend | AWS Lambda (Node.js 24, ESM) |
 | Database | DynamoDB (single-table design) |
 | Auth | Amazon Cognito |
-| IaC | AWS SAM (`backend/template.yaml`) |
+| IaC | AWS SAM (`infra/template.yaml`) |
 | CI/CD | GitHub Actions |
 
 ## Environments
@@ -54,21 +54,20 @@ frontend/
     shared/           # reusable UI components
 docs/
   testing-philosophy.md   # full testing strategy — read before writing tests
-specs/                # spec documents (created before implementation)
-  lambda/
-  component/
 ```
 
-## Spec-Driven Development Workflow
+## Blueprint-Driven Development Workflow
 
-**Every feature starts with a spec.** No implementation code before a spec is written and confirmed.
+**Every feature starts with a blueprint.** No implementation code before a blueprint is written and confirmed.
 
 Use the saved prompts:
-- `@new-lambda` — spec then implement a Lambda vertical slice
-- `@new-component` — spec then implement an Angular vertical slice
-- `@spec-review` — audit an existing implementation against its spec
+- `@new-lambda` — blueprint then implement a Lambda vertical slice
+- `@new-component` — blueprint then implement an Angular vertical slice
+- `@blueprint-review` — audit an existing implementation against its blueprint
 
-The spec lives in `specs/lambda/<name>.spec.md` or `specs/component/<name>.spec.md`.
+Specs are co-located with their implementation:
+- Lambda blueprints: `backend/src/functions/<role>/<feature-name>/0-<feature-name>.blueprint.md`
+- Component blueprints: `frontend/src/app/features/<role>/<feature-name>/0-<feature-name>.blueprint.md`
 
 ## Library Rules
 

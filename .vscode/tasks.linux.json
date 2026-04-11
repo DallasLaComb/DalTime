@@ -68,7 +68,7 @@
     {
       "label": "Backend: Validate SAM Template",
       "type": "shell",
-      "command": "sam validate --template template.yaml",
+      "command": "sam validate --template ../infra/template.yaml",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },

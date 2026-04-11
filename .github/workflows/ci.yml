@@ -101,7 +101,7 @@ jobs:
       # Build the SAM application — compiles Lambda functions and resolves dependencies.
       # Adds node_modules/.bin to PATH so SAM can find locally installed tools (e.g. esbuild).
       - name: Build SAM application
-        run: sam build
+        run: sam build --template-file ../infra/template.yaml
         working-directory: backend
         env:
           PATH: ${{ github.workspace }}/backend/node_modules/.bin:$PATH

@@ -53,6 +53,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'org-admin/managers',
+    canMatch: [authGuard, roleGuard],
+    data: { roles: ['OrgAdmin'] as const },
+    loadComponent: () =>
+      import('./features/org-admin/managers/managers').then((m) => m.ManagersComponent),
+  },
+  {
     path: 'org-admin',
     canMatch: [authGuard, roleGuard],
     data: { roles: ['OrgAdmin'] as const },
