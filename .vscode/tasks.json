@@ -22,7 +22,7 @@
     {
       "label": "Backend: Start Local API",
       "type": "shell",
-      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 && sam local start-api --port 3000 --env-vars local/env.json --profile AdministratorAccess-737780202102 --parameter-overrides LambdaArchitecture=arm64 DynamoDbEndpoint=http://host.docker.internal:8000 TableName=daltime-local CognitoUserPoolId=us-east-1_kzQ806uSv",
+      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 && sam local start-api --port 3000 --env-vars local/env.json --profile daltime-dev --parameter-overrides LambdaArchitecture=arm64 TableName=daltime-daltime-backend-dev CognitoUserPoolId=us-east-1_kzQ806uSv",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -45,12 +45,12 @@
         "panel": "dedicated",
         "clear": false
       },
-      "dependsOn": ["DynamoDB Local: Create Tables", "Docker: Clean SAM Containers"]
+      "dependsOn": ["Docker: Ensure Running", "Docker: Clean SAM Containers"]
     },
     {
       "label": "Docker: Clean SAM Containers",
       "type": "shell",
-      "command": "docker ps -aq --filter ancestor=public.ecr.aws/lambda/nodejs:24-rapid-arm64 | xargs -r docker rm -f 2>/dev/null; echo 'Stale SAM containers cleaned.'",
+      "command": "docker ps -aq --filter ancestor=public.ecr.aws/lambda/nodejs:24-rapid-arm64 | xargs docker rm -f 2>/dev/null; echo 'Stale SAM containers cleaned.'",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -221,7 +221,6 @@
       "label": "Start Full Stack (with install)",
       "dependsOn": [
         "Install All Dependencies",
-        "DynamoDB Local: Create Tables",
         "Start Servers"
       ],
       "dependsOrder": "sequence",
@@ -234,10 +233,8 @@
     {
       "label": "Start Full Stack",
       "dependsOn": [
-        "DynamoDB Local: Create Tables",
         "Start Servers"
       ],
-      "dependsOrder": "sequence",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -247,7 +244,7 @@
     {
       "label": "Docker: Ensure Running",
       "type": "shell",
-      "command": "echo 'Unsupported OS for this task'",
+      "command": "if docker info >/dev/null 2>&1; then echo 'Docker is already running.'; else echo 'ERROR: Docker is not running. Please start Docker Desktop.'; exit 1; fi",
       "linux": {
         "command": "if ! command -v docker &>/dev/null; then echo 'ERROR: Docker is not installed. Run: sudo apt install docker.io && sudo usermod -aG docker $USER'; exit 1; fi; if ! systemctl is-active --quiet docker 2>/dev/null; then echo 'Starting Docker daemon...'; sudo systemctl start docker; SECONDS=0; while ! systemctl is-active --quiet docker 2>/dev/null; do if [ $SECONDS -gt 60 ]; then echo 'ERROR: Docker failed to start within 60s'; exit 1; fi; echo \"  Waiting for Docker... (${SECONDS}s)\"; sleep 2; done; echo \"Docker is ready. (took ${SECONDS}s)\"; else echo 'Docker is already running.'; fi; if ! docker info >/dev/null 2>&1; then echo ''; echo 'WARNING: Docker is running but you cannot connect.'; echo 'You are likely not in the docker group. Run:'; echo '  sudo usermod -aG docker $USER'; echo 'Then log out and back in.'; exit 1; fi"
       },

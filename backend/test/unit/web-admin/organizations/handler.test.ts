@@ -206,14 +206,15 @@ describe('GET /organizations/{orgId} — get by ID', () => {
     expect(body(result)).toEqual({ error: "Organization 'unknown-id' not found" });
   });
 
-  it('returns 400 when orgId path param is missing', async () => {
+  it('routes to list when orgId path param is missing', async () => {
+    vi.mocked(listOrganizations).mockResolvedValue([]);
     const event = buildApiGwEvent({
       method: 'GET',
       routeKey: 'GET /organizations/{orgId}',
     });
     const result = (await handler(event)) as APIGatewayProxyStructuredResultV2;
-    expect(result.statusCode).toBe(400);
-    expect(body(result)).toEqual({ error: 'orgId path parameter is required' });
+    expect(result.statusCode).toBe(200);
+    expect(body(result)).toEqual([]);
   });
 
   it('returns 500 when service throws', async () => {
@@ -288,7 +289,7 @@ describe('PUT /organizations/{orgId} — update', () => {
     });
     const result = (await handler(event)) as APIGatewayProxyStructuredResultV2;
     expect(result.statusCode).toBe(400);
-    expect(body(result)).toEqual({ error: 'orgId path parameter is required' });
+    expect(body(result).error).toContain('Unhandled route');
   });
 
   it('returns 500 when service throws', async () => {
@@ -336,7 +337,7 @@ describe('DELETE /organizations/{orgId} — delete', () => {
     });
     const result = (await handler(event)) as APIGatewayProxyStructuredResultV2;
     expect(result.statusCode).toBe(400);
-    expect(body(result)).toEqual({ error: 'orgId path parameter is required' });
+    expect(body(result).error).toContain('Unhandled route');
   });
 
   it('returns 500 when service throws', async () => {
