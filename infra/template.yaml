@@ -179,7 +179,7 @@ Resources:
       FunctionName: !Sub "${AWS::StackName}-OrgAdminsFunction"
       LoggingConfig:
         LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrgAdminsFunction"
-      CodeUri: .
+      CodeUri: ../backend
       Handler: src/functions/web-admin/org-admins/handler.handler
       Events:
         ListOrgAdmins:
@@ -250,7 +250,7 @@ Resources:
       FunctionName: !Sub "${AWS::StackName}-ManagersFunction"
       LoggingConfig:
         LogGroup: !Sub "/aws/lambda/${AWS::StackName}-ManagersFunction"
-      CodeUri: .
+      CodeUri: ../backend
       Handler: src/functions/org-admin/managers/handler.handler
       Events:
         ListManagers:
@@ -328,7 +328,7 @@ Resources:
       FunctionName: !Sub "${AWS::StackName}-OrganizationsFunction"
       LoggingConfig:
         LogGroup: !Sub "/aws/lambda/${AWS::StackName}-OrganizationsFunction"
-      CodeUri: .
+      CodeUri: ../backend
       Handler: src/functions/web-admin/organizations/handler.handler
       Events:
         ListOrganizations:

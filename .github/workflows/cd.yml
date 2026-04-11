@@ -229,6 +229,7 @@ jobs:
       - name: Deploy SAM stack
         run: |
           sam deploy \
+            --template-file ../infra/template.yaml \
             --stack-name ${{ vars.SAM_STACK_NAME }} \
             --s3-bucket ${{ vars.SAM_S3_BUCKET }} \
             --capabilities CAPABILITY_IAM \

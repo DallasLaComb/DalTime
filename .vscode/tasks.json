@@ -4,7 +4,7 @@
     {
       "label": "Backend: Build SAM",
       "type": "shell",
-      "command": "sam build --parameter-overrides LambdaArchitecture=arm64",
+      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 --template-file ../infra/template.yaml",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -22,7 +22,7 @@
     {
       "label": "Backend: Start Local API",
       "type": "shell",
-      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 && sam local start-api --port 3000 --env-vars local/env.json --profile daltime-dev --parameter-overrides LambdaArchitecture=arm64 TableName=daltime-daltime-backend-dev CognitoUserPoolId=us-east-1_kzQ806uSv",
+      "command": "sam build --parameter-overrides LambdaArchitecture=arm64 --template-file ../infra/template.yaml && sam local start-api --port 3000 --env-vars local/env.json --profile daltime-dev --parameter-overrides LambdaArchitecture=arm64 TableName=daltime-daltime-backend-dev CognitoUserPoolId=us-east-1_kzQ806uSv",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -78,7 +78,7 @@
     {
       "label": "Backend: Validate SAM Template",
       "type": "shell",
-      "command": "sam validate --template template.yaml",
+      "command": "sam validate --template ../infra/template.yaml",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -92,7 +92,7 @@
     {
       "label": "Backend: Deploy to AWS",
       "type": "shell",
-      "command": "sam deploy --guided",
+      "command": "sam deploy --guided --template-file ../infra/template.yaml",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },

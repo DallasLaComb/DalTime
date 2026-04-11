@@ -91,9 +91,9 @@ For our testing approach and guidelines, see [Testing Philosophy](docs/testing-p
 
 | Type | Framework | Location |
 |------|-----------|----------|
-| Unit (Backend) | Jest | `backend/test/unit/` |
-| Unit (Frontend) | Jest | Co-located with each component/service |
-| Integration | Jest | `backend/test/integration/` |
+| Unit (Backend) | Vitest | `backend/test/unit/` |
+| Unit (Frontend) | Vitest | Co-located with each component/service |
+| Integration | Vitest | `backend/test/integration/` |
 | E2E | Robot Framework | `robot/` |
 
 ## Contributing
