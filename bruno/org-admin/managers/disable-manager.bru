@@ -1,0 +1,11 @@
+meta {
+  name: Disable Manager
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{base_url}}/org-admin/managers/{{manager_id}}
+  body: none
+  auth: none
+}

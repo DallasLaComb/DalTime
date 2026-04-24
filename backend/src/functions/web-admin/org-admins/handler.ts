@@ -9,6 +9,7 @@ import {
   notFound,
   conflict,
   internalError,
+  setRequestOrigin,
 } from '../../shared/response.js';
 import {
   ValidationError,
@@ -29,6 +30,8 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
   if (method === 'OPTIONS') {
     return ok('');
   }
+
+  setRequestOrigin(event.headers?.['origin']);
 
   if (!orgId) return badRequest('orgId path parameter is required');
 

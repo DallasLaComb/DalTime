@@ -10,6 +10,7 @@ import {
   badRequest,
   notFound,
   internalError,
+  setRequestOrigin,
 } from '../../shared/response.js';
 import { ValidationError, listOrganizations, getOrganization, createOrganization, updateOrganization, deleteOrganization } from './service.js';
 
@@ -20,6 +21,8 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
   if (method === 'OPTIONS') {
     return ok('');
   }
+
+  setRequestOrigin(event.headers?.['origin']);
 
   try {
     if (method === 'GET' && !orgId) {

@@ -63,13 +63,11 @@ Employees interact with the system to:
 - Node.js 24+
 - AWS CLI configured
 - AWS SAM CLI
-- Docker (for local Lambda testing)
-
 ### Local Development
 
-> **Note:** Docker must be running for the backend (SAM uses Docker to emulate Lambda locally).
+> **Note:** The local Angular dev server connects to the deployed dev backend in AWS. An active SSO session is required.
 
-**VS Code users (Mac):** Run `Tasks: Run Task` → `Start Full Stack` to launch everything automatically via the included `.vscode/tasks.json`. Windows support coming soon.
+**VS Code users (Mac):** Run `Tasks: Run Task` → `Start Full Stack` to launch the frontend dev server. Use `Backend: Deploy to Dev` to push Lambda changes. Windows support coming soon.
 
 **Manual setup:**
 
@@ -78,11 +76,13 @@ Employees interact with the system to:
 cd backend && npm install
 cd ../frontend && npm install
 
-# Start backend (requires Docker)
-cd backend && sam build && sam local start-api
-
-# Start frontend
+# Start frontend (points at deployed dev API)
 cd frontend && npm start
+
+# Deploy backend changes to dev
+aws sso login --sso-session daltime
+cd backend && sam build --parameter-overrides LambdaArchitecture=arm64 --template-file ../infra/template.yaml
+sam deploy --template-file .aws-sam/build/template.yaml --stack-name daltime-backend-dev --s3-bucket daltime-sam-artifacts --capabilities CAPABILITY_IAM --no-confirm-changeset --no-fail-on-empty-changeset --region us-east-1 --profile daltime-dev --parameter-overrides 'AllowedOrigins=http://localhost:4200,https://dev.daltime.com' CognitoUserPoolId=us-east-1_kzQ806uSv CognitoClientId=1nl13tbaqb47s8f0tfc07lc24m
 ```
 
 ## Testing

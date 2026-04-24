@@ -2,67 +2,28 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Backend: Build SAM",
+      "label": "Backend: Deploy to Dev",
       "type": "shell",
-      "command": "sam build",
+      "command": "sam build --template-file ../infra/template.yaml && sam deploy --template-file .aws-sam/build/template.yaml --stack-name daltime-backend-dev --s3-bucket daltime-sam-artifacts --capabilities CAPABILITY_IAM --no-confirm-changeset --no-fail-on-empty-changeset --region us-east-1 --profile daltime-dev --parameter-overrides 'AllowedOrigins=http://localhost:4200,https://dev.daltime.com' CognitoUserPoolId=us-east-1_kzQ806uSv CognitoClientId=1nl13tbaqb47s8f0tfc07lc24m",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
       "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },>
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
-    },
-    {
-      "label": "Backend: Start Local API",
-      "type": "shell",
-      "command": "sam local start-api --port 3000 --env-vars local/env.json",
-      "options": {
-        "cwd": "${workspaceFolder}/backend"
-      },
-      "isBackground": true,
-      "problemMatcher": {
-        "pattern": {
-          "regexp": "^.*$",
-          "file": 1,
-          "location": 2,
-          "message": 3
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "^.*Mounting.*$",
-          "endsPattern": "^.*Running on http://127.0.0.1:3000.*$"
-        }
-      },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
-        "clear": false
+        "clear": true
       },
-      "dependsOn": ["Backend: Build SAM"]
+      "dependsOn": ["AWS: Ensure SSO Login"]
     },
     {
-      "label": "Backend: Invoke Test Function",
+      "label": "AWS: Ensure SSO Login",
       "type": "shell",
-      "command": "sam local invoke TestFunction --no-event",
-      "options": {
-        "cwd": "${workspaceFolder}/backend"
-      },
+      "command": "if aws sts get-caller-identity --profile daltime-dev >/dev/null 2>&1; then echo 'AWS SSO session is active.'; else echo ''; echo '⚠️  AWS SSO session expired or not logged in.'; echo 'Run: aws sso login --sso-session daltime'; echo ''; exit 1; fi",
       "problemMatcher": [],
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
       "presentation": {
         "reveal": "always",
-        "panel": "shared",
-        "clear": true
+        "panel": "shared"
       }
     },
     {
@@ -79,20 +40,7 @@
         "clear": true
       }
     },
-    {
-      "label": "Backend: Deploy to AWS",
-      "type": "shell",
-      "command": "sam deploy --guided",
-      "options": {
-        "cwd": "${workspaceFolder}/backend"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
+
     {
       "label": "Backend: Install Dependencies",
       "type": "shell",
@@ -158,52 +106,9 @@
       "problemMatcher": []
     },
     {
-      "label": "DynamoDB Local: Start",
-      "type": "shell",
-      "command": "docker compose up -d",
-      "options": {
-        "cwd": "${workspaceFolder}/backend/local"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "dependsOn": ["Docker: Ensure Running"]
-    },
-    {
-      "label": "DynamoDB Local: Create Tables",
-      "type": "shell",
-      "command": "bash local/create-tables.sh",
-      "options": {
-        "cwd": "${workspaceFolder}/backend"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "dependsOn": ["DynamoDB Local: Start"]
-    },
-    {
-      "label": "DynamoDB Local: Stop",
-      "type": "shell",
-      "command": "docker compose down",
-      "options": {
-        "cwd": "${workspaceFolder}/backend/local"
-      },
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
       "label": "Start Full Stack (with install)",
       "dependsOn": [
         "Install All Dependencies",
-        "DynamoDB Local: Create Tables",
-        "Backend: Start Local API",
         "Frontend: Start Dev Server"
       ],
       "dependsOrder": "sequence",
@@ -216,59 +121,12 @@
     {
       "label": "Start Full Stack",
       "dependsOn": [
-        "DynamoDB Local: Create Tables",
-        "Backend: Start Local API",
         "Frontend: Start Dev Server"
       ],
-      "dependsOrder": "sequence",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "shared"
-      }
-    },
-    {
-      "label": "Docker: Ensure Running",
-      "type": "shell",
-      "command": "if ! docker info > /dev/null 2>&1; then echo 'Starting Docker daemon...'; sudo systemctl start docker; SECONDS=0; while ! docker info > /dev/null 2>&1; do echo \"  Waiting for Docker... (${SECONDS}s)\"; sleep 2; done; echo \"Docker is ready. (took ${SECONDS}s)\"; else echo 'Docker is already running.'; fi",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
-    },
-    {
-      "label": "Docker: List SAM Images",
-      "type": "shell",
-      "command": "docker images | grep -E 'REPOSITORY|lambda/nodejs' || echo 'No Lambda images found'",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
-    },
-    {
-      "label": "Docker: Startup Blame",
-      "type": "shell",
-      "command": "echo '--- Docker systemd timing ---' && sudo systemd-analyze blame | grep docker && echo '' && echo '--- Docker info ---' && docker info 2>&1 | grep -E 'Storage Driver|Server Version|Operating System|Total Memory'",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
-    },
-    {
-      "label": "Docker: Prune All",
-      "type": "shell",
-      "command": "echo 'Current disk usage:' && docker system df && echo '' && echo 'Pruning unused images, containers, networks, and build cache...' && docker system prune -a -f && echo '' && echo 'Disk usage after prune:' && docker system df",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
       }
     }
   ]

@@ -54,6 +54,7 @@ describe('OrganizationsComponent', () => {
   ) {
     orgService = buildOrgServiceMock(serviceOverrides);
 
+    TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [OrganizationsComponent],
       providers: [

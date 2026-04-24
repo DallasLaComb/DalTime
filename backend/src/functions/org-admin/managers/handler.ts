@@ -10,6 +10,7 @@ import {
   conflict,
   forbidden,
   internalError,
+  setRequestOrigin,
 } from '../../shared/response.js';
 import {
   ValidationError,
@@ -32,9 +33,9 @@ export const handler = async (event: APIGatewayProxyEventV2WithJWTAuthorizer) =>
     return ok('');
   }
 
-  const callerSub = event.requestContext?.authorizer?.jwt?.claims?.['sub'] as string
-    ?? process.env['LOCAL_USER_SUB']
-    ?? '';
+  setRequestOrigin(event.headers?.['origin']);
+
+  const callerSub = event.requestContext?.authorizer?.jwt?.claims?.['sub'] as string ?? '';
 
   try {
     if (method === 'GET') {

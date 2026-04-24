@@ -2,8 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ManagersService } from './managers.service';
+import { environment } from '../../../../environments/environment';
 
-const API_BASE = 'http://localhost:3000/org-admin/managers';
+const API_BASE = `${environment.api.baseUrl}/org-admin/managers`;
 
 const mockManager = {
   manager_id: 'mgr-123',
@@ -24,6 +25,7 @@ describe('ManagersService', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [ManagersService, provideHttpClient(), provideHttpClientTesting()],
     });

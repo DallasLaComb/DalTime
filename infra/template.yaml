@@ -3,10 +3,10 @@ Transform: AWS::Serverless-2016-10-31
 Description: DalTime Scheduling Application Backend
 
 Parameters:
-  AllowedOrigin:
-    Type: String
+  AllowedOrigins:
+    Type: CommaDelimitedList
     Default: "http://localhost:4200"
-    Description: "Frontend origin for CORS"
+    Description: "Comma-separated frontend origins for CORS"
   CognitoUserPoolId:
     Type: String
     Default: "us-east-1_LVp3uUQ5l"
@@ -19,17 +19,6 @@ Parameters:
     AllowedValues:
       - arm64
       - x86_64
-  DynamoDbEndpoint:
-    Type: String
-    Default: ""
-    Description: "DynamoDB endpoint override for local development"
-  TableName:
-    Type: String
-    Default: ""
-    Description: "DynamoDB table name override for local development"
-
-Conditions:
-  UseTableNameOverride: !Not [!Equals [!Ref TableName, ""]]
 
 Globals:
   Function:
@@ -40,12 +29,8 @@ Globals:
     Environment:
       Variables:
         NODE_ENV: development
-        ALLOWED_ORIGIN: !Ref AllowedOrigin
-        DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
-        TABLE_NAME: !If
-          - UseTableNameOverride
-          - !Ref TableName
-          - !Ref DalTimeTable
+        ALLOWED_ORIGINS: !Join [",", !Ref AllowedOrigins]
+        TABLE_NAME: !Ref DalTimeTable
 
 Resources:
 
@@ -130,8 +115,7 @@ Resources:
                 - !Ref CognitoClientId
             IdentitySource: "$request.header.Authorization"
       CorsConfiguration:
-        AllowOrigins:
-          - !Ref AllowedOrigin
+        AllowOrigins: !Ref AllowedOrigins
         AllowHeaders:
           - Content-Type
           - Authorization
@@ -296,7 +280,6 @@ Resources:
       Environment:
         Variables:
           USER_POOL_ID: !Ref CognitoUserPoolId
-          LOCAL_USER_SUB: ""
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref DalTimeTable

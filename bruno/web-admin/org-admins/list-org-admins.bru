@@ -1,0 +1,11 @@
+meta {
+  name: List Org Admins
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/web-admin/organizations/{{org_id}}/org-admins
+  body: none
+  auth: none
+}

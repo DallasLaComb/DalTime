@@ -2,11 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 
 /** Shared DynamoDB Document Client — initialised once per Lambda cold start. */
-const dynamoConfig = process.env.DYNAMODB_ENDPOINT
-  ? { endpoint: process.env.DYNAMODB_ENDPOINT, region: process.env.AWS_DEFAULT_REGION ?? 'us-east-1' }
-  : {};
-
-const client = new DynamoDBClient(dynamoConfig);
+const client = new DynamoDBClient({});
 export const docClient = DynamoDBDocumentClient.from(client);
 
 /** Single table name injected via environment variable. */

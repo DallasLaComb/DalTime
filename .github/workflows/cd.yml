@@ -237,7 +237,7 @@ jobs:
             --no-fail-on-empty-changeset \
             --region us-east-1 \
             --parameter-overrides \
-              AllowedOrigin=${{ vars.ALLOWED_ORIGIN }} \
+              AllowedOrigins=${{ vars.ALLOWED_ORIGINS }} \
               CognitoUserPoolId=${{ steps.foundation.outputs.user_pool_id }} \
               CognitoClientId=${{ steps.foundation.outputs.client_id }}
         working-directory: backend

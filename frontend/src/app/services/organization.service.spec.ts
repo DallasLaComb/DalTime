@@ -2,10 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { OrganizationService } from './organization.service';
+import { environment } from '../../environments/environment';
 
-// Tests run under the 'development' Angular build config which maps
-// environment.ts → environment.local.ts (baseUrl = 'http://localhost:3000').
-const API_BASE = 'http://localhost:3000/organizations';
+const API_BASE = `${environment.api.baseUrl}/organizations`;
 
 const mockOrg = {
   org_id: 'org-123',
@@ -21,6 +20,7 @@ describe('OrganizationService', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [OrganizationService, provideHttpClient(), provideHttpClientTesting()],
     });

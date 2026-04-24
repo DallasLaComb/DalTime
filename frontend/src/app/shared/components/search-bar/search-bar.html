@@ -1,0 +1,21 @@
+<div class="input-group" data-testid="search-bar-container">
+  <input
+    type="text"
+    class="form-control"
+    [placeholder]="placeholder()"
+    [attr.aria-label]="ariaLabel()"
+    data-testid="search-bar"
+    [value]="searchValue()"
+    (input)="onInput($event)"
+  />
+  @if (searchValue()) {
+    <button
+      class="btn btn-outline-secondary"
+      type="button"
+      (click)="clear()"
+      aria-label="Clear search"
+    >
+      &times;
+    </button>
+  }
+</div>
