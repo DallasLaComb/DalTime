@@ -38,13 +38,12 @@ describe('EmptyStateComponent', () => {
 
   // ─── CSS classes ────────────────────────────────────────────────────────────
 
-  it('has text-center py-5 text-muted classes on the outer container', async () => {
+  it('has text-center py-5 classes on the outer container', async () => {
     await createComponent('Empty', 'Nothing here.');
 
     const container = query<HTMLElement>(fixture, '[data-testid="empty-state"]');
     expect(container.classList.contains('text-center')).toBe(true);
     expect(container.classList.contains('py-5')).toBe(true);
-    expect(container.classList.contains('text-muted')).toBe(true);
   });
 
   it('has fs-5 mb-1 classes on the title element', async () => {

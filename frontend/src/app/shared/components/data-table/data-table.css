@@ -1,1 +1,9 @@
-/* DataTableComponent styles */
+thead {
+  background-color: var(--dt-neutral-50);
+}
+
+th {
+  color: var(--dt-neutral-700);
+  font-weight: 600;
+  border-bottom-color: var(--dt-neutral-200);
+}

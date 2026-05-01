@@ -161,7 +161,7 @@ describe('ManagersComponent', () => {
     const getAll = vi.fn().mockReturnValue(throwError(() => new Error('fail')));
     await createComponent({ getAll });
 
-    query<HTMLButtonElement>(fixture, 'retry-btn').click();
+    query<HTMLButtonElement>(fixture, 'error-alert-retry').click();
     fixture.detectChanges();
     await fixture.whenStable();
 
@@ -173,7 +173,7 @@ describe('ManagersComponent', () => {
   it('opens register modal with blank fields', async () => {
     await createComponent();
 
-    query<HTMLButtonElement>(fixture, 'register-btn').click();
+    query<HTMLButtonElement>(fixture, 'page-header-action').click();
     fixture.detectChanges();
 
     expect(query(fixture, 'register-modal')).toBeTruthy();
@@ -185,7 +185,7 @@ describe('ManagersComponent', () => {
   it('shows required field errors when submitting blank register form', async () => {
     await createComponent();
 
-    query<HTMLButtonElement>(fixture, 'register-btn').click();
+    query<HTMLButtonElement>(fixture, 'page-header-action').click();
     fixture.detectChanges();
 
     query<HTMLButtonElement>(fixture, 'save-register-btn').click();
@@ -201,7 +201,7 @@ describe('ManagersComponent', () => {
   it('calls create() with correct body when register form is valid', async () => {
     await createComponent();
 
-    query<HTMLButtonElement>(fixture, 'register-btn').click();
+    query<HTMLButtonElement>(fixture, 'page-header-action').click();
     fixture.detectChanges();
 
     const setInput = (testid: string, value: string) => {
@@ -235,7 +235,7 @@ describe('ManagersComponent', () => {
       create: vi.fn().mockReturnValue(throwError(() => ({ status: 409 }))),
     });
 
-    query<HTMLButtonElement>(fixture, 'register-btn').click();
+    query<HTMLButtonElement>(fixture, 'page-header-action').click();
     fixture.detectChanges();
 
     const setInput = (testid: string, value: string) => {
@@ -324,7 +324,7 @@ describe('ManagersComponent', () => {
     queryAll<HTMLButtonElement>(fixture, 'disable-btn')[0].click();
     fixture.detectChanges();
 
-    expect(query(fixture, 'disable-modal')).toBeTruthy();
+    expect(query(fixture, 'confirmation-modal')).toBeTruthy();
     expect(query(fixture, 'disable-manager-name').textContent?.trim()).toBe('John Doe');
     expect(query(fixture, 'disable-manager-email').textContent?.trim()).toBe('john@acme.com');
   });
@@ -335,12 +335,12 @@ describe('ManagersComponent', () => {
     queryAll<HTMLButtonElement>(fixture, 'disable-btn')[0].click();
     fixture.detectChanges();
 
-    query<HTMLButtonElement>(fixture, 'confirm-disable-btn').click();
+    query<HTMLButtonElement>(fixture, 'confirmation-modal-confirm').click();
     await fixture.whenStable();
     fixture.detectChanges();
 
     expect(service.disable).toHaveBeenCalledWith('mgr-123');
-    expect(query(fixture, 'disable-modal')).toBeNull();
+    expect(query(fixture, 'confirmation-modal')).toBeNull();
   });
 
   it('closes disable modal when cancel is clicked', async () => {
@@ -348,11 +348,11 @@ describe('ManagersComponent', () => {
 
     queryAll<HTMLButtonElement>(fixture, 'disable-btn')[0].click();
     fixture.detectChanges();
-    expect(query(fixture, 'disable-modal')).toBeTruthy();
+    expect(query(fixture, 'confirmation-modal')).toBeTruthy();
 
-    query<HTMLButtonElement>(fixture, 'cancel-disable-btn').click();
+    query<HTMLButtonElement>(fixture, 'confirmation-modal-cancel').click();
     fixture.detectChanges();
 
-    expect(query(fixture, 'disable-modal')).toBeNull();
+    expect(query(fixture, 'confirmation-modal')).toBeNull();
   });
 });

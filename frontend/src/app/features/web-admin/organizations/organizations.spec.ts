@@ -72,13 +72,12 @@ describe('OrganizationsComponent', () => {
   // ─── Loading state ───────────────────────────────────────────────────────────
 
   it('shows loading spinner while getAll is pending', async () => {
-    // Use a Subject that never emits to simulate a pending request
     const { Subject } = await import('rxjs');
     const pending$ = new Subject();
     await createComponent({ getAll: vi.fn().mockReturnValue(pending$) });
 
     expect(query(fixture, 'loading-spinner')).toBeTruthy();
-    expect(query(fixture, 'org-table')).toBeNull();
+    expect(query(fixture, 'org-row')).toBeNull();
     expect(query(fixture, 'empty-state')).toBeNull();
   });
 
@@ -88,12 +87,11 @@ describe('OrganizationsComponent', () => {
     await createComponent();
 
     expect(query(fixture, 'loading-spinner')).toBeNull();
-    expect(query(fixture, 'org-table')).toBeTruthy();
 
     // Both card (mobile) and table (desktop) layouts render simultaneously in
     // jsdom — CSS breakpoints don't apply, so each org appears twice in the DOM.
     const rows = queryAll(fixture, 'org-row');
-    expect(rows.length).toBe(4); // 2 orgs × 2 layouts
+    expect(rows.length).toBe(2);
 
     const names = queryAll(fixture, 'org-name');
     expect(names[0].textContent?.trim()).toBe('Acme Corp');
@@ -106,7 +104,7 @@ describe('OrganizationsComponent', () => {
     await createComponent({ getAll: vi.fn().mockReturnValue(of([])) });
 
     expect(query(fixture, 'empty-state')).toBeTruthy();
-    expect(query(fixture, 'org-table')).toBeNull();
+    expect(query(fixture, 'org-row')).toBeNull();
   });
 
   // ─── Error state ─────────────────────────────────────────────────────────────
@@ -123,8 +121,7 @@ describe('OrganizationsComponent', () => {
     const getAll = vi.fn().mockReturnValue(throwError(() => new Error('Network error')));
     await createComponent({ getAll });
 
-    const retryBtn = query<HTMLButtonElement>(fixture, 'retry-btn');
-    retryBtn.click();
+    query<HTMLButtonElement>(fixture, 'error-alert-retry').click();
     fixture.detectChanges();
     await fixture.whenStable();
 
@@ -136,7 +133,7 @@ describe('OrganizationsComponent', () => {
   it('opens the create modal with blank fields when create button is clicked', async () => {
     await createComponent();
 
-    query<HTMLButtonElement>(fixture, 'create-org-btn').click();
+    query<HTMLButtonElement>(fixture, 'page-header-action').click();
     fixture.detectChanges();
 
     const modal = query(fixture, 'org-modal');
@@ -161,7 +158,7 @@ describe('OrganizationsComponent', () => {
   it('disables the save button when name input is blank', async () => {
     await createComponent();
 
-    query<HTMLButtonElement>(fixture, 'create-org-btn').click();
+    query<HTMLButtonElement>(fixture, 'page-header-action').click();
     fixture.detectChanges();
 
     const saveBtn = query<HTMLButtonElement>(fixture, 'save-org-btn');
@@ -171,7 +168,7 @@ describe('OrganizationsComponent', () => {
   it('calls create() with the correct body when save is clicked in create mode', async () => {
     await createComponent();
 
-    query<HTMLButtonElement>(fixture, 'create-org-btn').click();
+    query<HTMLButtonElement>(fixture, 'page-header-action').click();
     fixture.detectChanges();
 
     const nameInput = query<HTMLInputElement>(fixture, 'org-name-input');
@@ -216,7 +213,7 @@ describe('OrganizationsComponent', () => {
   it('closes the modal when cancel is clicked', async () => {
     await createComponent();
 
-    query<HTMLButtonElement>(fixture, 'create-org-btn').click();
+    query<HTMLButtonElement>(fixture, 'page-header-action').click();
     fixture.detectChanges();
     expect(query(fixture, 'org-modal')).toBeTruthy();
 
@@ -234,7 +231,7 @@ describe('OrganizationsComponent', () => {
     queryAll<HTMLButtonElement>(fixture, 'delete-org-btn')[0].click();
     fixture.detectChanges();
 
-    expect(query(fixture, 'delete-modal')).toBeTruthy();
+    expect(query(fixture, 'confirmation-modal')).toBeTruthy();
     expect(query(fixture, 'delete-org-name').textContent?.trim()).toBe('Acme Corp');
   });
 
@@ -244,12 +241,12 @@ describe('OrganizationsComponent', () => {
     queryAll<HTMLButtonElement>(fixture, 'delete-org-btn')[0].click();
     fixture.detectChanges();
 
-    query<HTMLButtonElement>(fixture, 'confirm-delete-btn').click();
+    query<HTMLButtonElement>(fixture, 'confirmation-modal-confirm').click();
     await fixture.whenStable();
     fixture.detectChanges();
 
     expect(orgService.delete).toHaveBeenCalledWith('org-123');
-    expect(query(fixture, 'delete-modal')).toBeNull();
+    expect(query(fixture, 'confirmation-modal')).toBeNull();
   });
 
   it('closes the delete modal when cancel is clicked', async () => {
@@ -257,11 +254,11 @@ describe('OrganizationsComponent', () => {
 
     queryAll<HTMLButtonElement>(fixture, 'delete-org-btn')[0].click();
     fixture.detectChanges();
-    expect(query(fixture, 'delete-modal')).toBeTruthy();
+    expect(query(fixture, 'confirmation-modal')).toBeTruthy();
 
-    query<HTMLButtonElement>(fixture, 'cancel-delete-btn').click();
+    query<HTMLButtonElement>(fixture, 'confirmation-modal-cancel').click();
     fixture.detectChanges();
 
-    expect(query(fixture, 'delete-modal')).toBeNull();
+    expect(query(fixture, 'confirmation-modal')).toBeNull();
   });
 });

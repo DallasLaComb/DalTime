@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal, type OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { ButtonComponent } from '@common-daltime';
 import { AuthService } from '../auth';
 
 @Component({
   selector: 'app-change-password',
+  imports: [ButtonComponent],
   templateUrl: './change-password.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

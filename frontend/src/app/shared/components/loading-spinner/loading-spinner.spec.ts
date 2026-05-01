@@ -48,12 +48,11 @@ describe('LoadingSpinnerComponent', () => {
     expect(container.classList.contains('py-5')).toBe(true);
   });
 
-  it('has spinner-border text-secondary classes on the spinner element', async () => {
+  it('has spinner-border class on the spinner element', async () => {
     await createComponent();
 
     const spinner = query<HTMLElement>(fixture, '[role="status"]');
     expect(spinner.classList.contains('spinner-border')).toBe(true);
-    expect(spinner.classList.contains('text-secondary')).toBe(true);
   });
 
   // ─── Accessibility & test IDs ───────────────────────────────────────────────

@@ -1,0 +1,24 @@
+<div class="dt-debug container-fluid py-3 py-md-4">
+
+  <app-page-header [title]="title()" [actionLabel]="actionLabel()" (action)="action.emit()">
+    <ng-content select="[slot=before-title]" slot="before-title" />
+  </app-page-header>
+
+  @if (loading()) {
+    <app-loading-spinner />
+  }
+
+  @if (error()) {
+    <app-error-alert [message]="error()!" [retryable]="true" (retry)="retry.emit()" />
+  }
+
+  @if (!loading() && !error()) {
+    @if (empty()) {
+      <app-empty-state [title]="emptyTitle()" [description]="emptyDescription()" />
+    } @else {
+      <ng-content />
+    }
+  }
+</div>
+
+<ng-content select="[slot=modals]" />

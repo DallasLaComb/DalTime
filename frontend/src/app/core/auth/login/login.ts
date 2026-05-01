@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { ButtonComponent } from '@common-daltime';
 import { AuthService } from '../auth';
 
 @Component({
   selector: 'app-login',
-  imports: [RouterLink],
+  imports: [RouterLink, ButtonComponent],
   templateUrl: './login.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

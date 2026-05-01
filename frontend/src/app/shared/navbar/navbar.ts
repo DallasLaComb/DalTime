@@ -1,11 +1,12 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { ButtonComponent } from '@common-daltime';
 import { AuthService } from '../../core/auth/auth';
 import { ROLE_DASHBOARD_MAP } from '../../core/auth/user-role.model';
 
 @Component({
   selector: 'app-navbar',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, ButtonComponent],
   templateUrl: './navbar.html',
   styleUrl: './navbar.css',
 })

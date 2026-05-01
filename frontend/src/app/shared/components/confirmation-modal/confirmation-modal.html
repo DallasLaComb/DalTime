@@ -12,22 +12,23 @@
       class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down"
       (click)="$event.stopPropagation()"
     >
-      <div class="modal-content">
+      <div class="dt-debug modal-content rounded-3 shadow-sm">
         <div class="modal-header">
-          <h5 class="modal-title">{{ title() }}</h5>
-          <button type="button" class="btn-close" (click)="cancel.emit()"></button>
+          <h5 class="modal-title fw-semibold">{{ title() }}</h5>
+          <button type="button" class="btn-close" data-testid="confirmation-modal-close" (click)="cancel.emit()"></button>
         </div>
         <div class="modal-body">
           <ng-content></ng-content>
         </div>
         <div class="modal-footer flex-column flex-sm-row">
-          <button class="btn btn-outline-secondary w-100 w-sm-auto" (click)="cancel.emit()">
+          <app-button variant="secondary" [fullWidth]="true" testId="confirmation-modal-cancel" (clicked)="cancel.emit()">
             Cancel
-          </button>
+          </app-button>
           <button
             class="btn w-100 w-sm-auto"
             [class]="confirmStyle()"
             [disabled]="saving()"
+            data-testid="confirmation-modal-confirm"
             (click)="confirm.emit()"
           >
             @if (saving()) {

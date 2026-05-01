@@ -11,5 +11,7 @@ export class StatusBadgeComponent {
   label = input.required<string>();
   colorMap = input.required<Record<string, string>>();
 
-  badgeClass = computed(() => this.colorMap()[this.status()] ?? 'bg-secondary');
+  badgeClass = computed(
+    () => `dt-debug badge rounded-pill ${this.colorMap()[this.status()] ?? 'bg-secondary'}`
+  );
 }

@@ -1,16 +1,16 @@
 .site-footer {
   padding: 1.25rem 0;
-  border-top: 1px solid #e5e5e5;
-  background: #fafafa;
+  border-top: 1px solid var(--dt-neutral-200);
+  background: var(--dt-neutral-50);
 }
 
 .footer-link {
   font-size: 0.8125rem;
-  color: #666;
+  color: var(--dt-neutral-500);
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .footer-link:hover {
-  color: #1a1a2e;
+  color: var(--dt-primary);
 }

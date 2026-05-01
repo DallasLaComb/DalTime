@@ -1,11 +1,11 @@
-<div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2 mb-4">
+<div class="dt-debug d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2 mb-4">
   <div>
     <ng-content select="[slot=before-title]"></ng-content>
-    <h2 class="mb-0">{{ title() }}</h2>
+    <h2 class="mb-0 fw-semibold">{{ title() }}</h2>
   </div>
   @if (actionLabel()) {
-    <button class="btn btn-dark w-100 w-sm-auto" (click)="action.emit()">
+    <app-button variant="primary" [fullWidth]="true" testId="page-header-action" (clicked)="action.emit()">
       {{ actionLabel() }}
-    </button>
+    </app-button>
   }
 </div>

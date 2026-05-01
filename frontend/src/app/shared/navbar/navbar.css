@@ -1,0 +1,26 @@
+.navbar-brand {
+  color: var(--dt-primary);
+}
+
+.nav-link.active {
+  color: var(--dt-primary);
+  font-weight: 600;
+}
+
+.btn-primary {
+  background-color: var(--dt-primary);
+  border-color: var(--dt-primary);
+}
+
+.btn-primary:hover {
+  background-color: var(--dt-secondary);
+  border-color: var(--dt-secondary);
+}
+
+.modal-header {
+  border-bottom-color: var(--dt-neutral-200);
+}
+
+.modal-footer {
+  border-top-color: var(--dt-neutral-200);
+}

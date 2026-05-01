@@ -1,1 +1,3 @@
-/* EmptyStateComponent styles */
+.empty-state-title {
+  color: var(--dt-neutral-700);
+}

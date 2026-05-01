@@ -1,14 +1,32 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { DatePipe, NgClass } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
+import {
+  CrudPageComponent,
+  DataTableComponent,
+  CardListComponent,
+  StatusBadgeComponent,
+  ConfirmationModalComponent,
+  ButtonComponent,
+} from '@common-daltime';
+import type { ColumnDef } from '@common-daltime';
 import { OrgAdminsService } from '../../../services/org-admins.service';
 import { OrganizationService } from '../../../services/organization.service';
 import type { OrgAdminUserResponse } from '../../../core/models/org-admin-user.model';
 
 @Component({
   selector: 'app-org-admins',
-  imports: [DatePipe, NgClass, RouterLink],
+  imports: [
+    DatePipe,
+    RouterLink,
+    CrudPageComponent,
+    DataTableComponent,
+    CardListComponent,
+    StatusBadgeComponent,
+    ConfirmationModalComponent,
+    ButtonComponent,
+  ],
   templateUrl: './org-admins.html',
   styleUrl: './org-admins.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,6 +56,21 @@ export class OrgAdminsComponent {
   readonly showPassword = signal(false);
   readonly formSubmitted = signal(false);
 
+  readonly columns: ColumnDef[] = [
+    { header: 'Name' },
+    { header: 'Email' },
+    { header: 'Status' },
+    { header: 'Created' },
+    { header: 'Actions', cssClass: 'text-end' },
+  ];
+
+  readonly trackById = (_index: number, admin: OrgAdminUserResponse): string => admin.user_id;
+
+  readonly statusColorMap: Record<string, string> = {
+    CONFIRMED: 'bg-success',
+    FORCE_CHANGE_PASSWORD: 'bg-warning text-dark',
+  };
+
   constructor() {
     this.load();
   }
@@ -65,11 +98,6 @@ export class OrgAdminsComponent {
   statusLabel(status: string): string {
     if (status === 'CONFIRMED') return 'Active';
     return 'Pending';
-  }
-
-  statusClass(status: string): string {
-    if (status === 'CONFIRMED') return 'bg-success';
-    return 'bg-warning text-dark';
   }
 
   openRegisterModal(): void {

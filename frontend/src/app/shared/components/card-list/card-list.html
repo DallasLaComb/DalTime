@@ -1,7 +1,7 @@
-<div class="d-lg-none">
+<div class="dt-debug d-lg-none">
   @for (item of data(); track trackBy()($index, item)) {
-    <div class="card mb-3 shadow-sm">
-      <div class="card-body">
+    <div class="card mb-3 shadow-sm border-0 rounded-3">
+      <div class="card-body p-4">
         <ng-container *ngTemplateOutlet="cardTemplate(); context: { $implicit: item }">
         </ng-container>
       </div>

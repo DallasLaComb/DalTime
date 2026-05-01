@@ -1,7 +1,7 @@
-<div class="input-group" data-testid="search-bar-container">
+<div class="dt-debug input-group" data-testid="search-bar-container">
   <input
     type="text"
-    class="form-control"
+    class="form-control rounded-start-3"
     [placeholder]="placeholder()"
     [attr.aria-label]="ariaLabel()"
     data-testid="search-bar"
@@ -10,10 +10,11 @@
   />
   @if (searchValue()) {
     <button
-      class="btn btn-outline-secondary"
+      class="btn btn-outline-secondary rounded-end-3"
       type="button"
       (click)="clear()"
       aria-label="Clear search"
+      data-testid="search-bar-clear"
     >
       &times;
     </button>

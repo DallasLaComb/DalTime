@@ -1,11 +1,28 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { DatePipe, NgClass } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { ManagersService } from './managers.service';
 import type { ManagerResponse } from '../../../core/models/manager.model';
+import type { ColumnDef } from '@common-daltime';
+import {
+  CrudPageComponent,
+  DataTableComponent,
+  CardListComponent,
+  StatusBadgeComponent,
+  ConfirmationModalComponent,
+  ButtonComponent,
+} from '@common-daltime';
 
 @Component({
   selector: 'app-managers',
-  imports: [DatePipe, NgClass],
+  imports: [
+    DatePipe,
+    CrudPageComponent,
+    DataTableComponent,
+    CardListComponent,
+    StatusBadgeComponent,
+    ConfirmationModalComponent,
+    ButtonComponent,
+  ],
   templateUrl: './managers.html',
   styleUrl: './managers.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,6 +59,24 @@ export class ManagersComponent {
   readonly showDisableModal = signal(false);
   readonly disablingManager = signal<ManagerResponse | null>(null);
 
+  readonly columns: ColumnDef[] = [
+    { header: 'Name' },
+    { header: 'Email' },
+    { header: 'Phone' },
+    { header: 'Status' },
+    { header: 'Employees' },
+    { header: 'Created' },
+    { header: 'Actions', cssClass: 'text-end' },
+  ];
+
+  readonly trackById = (_index: number, manager: ManagerResponse): string => manager.manager_id;
+
+  readonly statusColorMap: Record<string, string> = {
+    CONFIRMED: 'bg-success',
+    DISABLED: 'bg-secondary',
+    FORCE_CHANGE_PASSWORD: 'bg-warning text-dark',
+  };
+
   constructor() {
     this.load();
   }
@@ -65,12 +100,6 @@ export class ManagersComponent {
     if (status === 'CONFIRMED') return 'Active';
     if (status === 'DISABLED') return 'Disabled';
     return 'Pending';
-  }
-
-  statusClass(status: string): string {
-    if (status === 'CONFIRMED') return 'bg-success';
-    if (status === 'DISABLED') return 'bg-secondary';
-    return 'bg-warning text-dark';
   }
 
   // ─── Register ────────────────────────────────────────────────────────

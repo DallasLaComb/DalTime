@@ -7,9 +7,11 @@ import {
   output,
   viewChild,
 } from '@angular/core';
+import { ButtonComponent } from '@common-daltime';
 
 @Component({
   selector: 'app-confirmation-modal',
+  imports: [ButtonComponent],
   templateUrl: './confirmation-modal.html',
   styleUrl: './confirmation-modal.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

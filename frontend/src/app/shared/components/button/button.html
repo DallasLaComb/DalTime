@@ -1,0 +1,12 @@
+<button
+  [class]="btnClass()"
+  [type]="type()"
+  [disabled]="isDisabled()"
+  [attr.data-testid]="testId()"
+  (click)="clicked.emit()"
+>
+  @if (loading()) {
+    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+  }
+  <ng-content />
+</button>

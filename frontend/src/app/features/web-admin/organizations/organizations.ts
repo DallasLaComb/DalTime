@@ -1,12 +1,27 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
+import {
+  CrudPageComponent,
+  DataTableComponent,
+  CardListComponent,
+  ConfirmationModalComponent,
+  ButtonComponent,
+} from '@common-daltime';
+import type { ColumnDef } from '@common-daltime';
 import { OrganizationService } from '../../../services/organization.service';
 import type { Organization } from '../../../core/models/organization.model';
 
 @Component({
   selector: 'app-organizations',
-  imports: [DatePipe],
+  imports: [
+    DatePipe,
+    CrudPageComponent,
+    DataTableComponent,
+    CardListComponent,
+    ConfirmationModalComponent,
+    ButtonComponent,
+  ],
   templateUrl: './organizations.html',
   styleUrl: './organizations.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -27,6 +42,17 @@ export class OrganizationsComponent {
 
   readonly formName = signal('');
   readonly formAddress = signal('');
+
+  readonly columns: ColumnDef[] = [
+    { header: 'ID', cssClass: 'd-none d-xl-table-cell' },
+    { header: 'Name' },
+    { header: 'Address' },
+    { header: 'Org Admins' },
+    { header: 'Created' },
+    { header: 'Actions', cssClass: 'text-end' },
+  ];
+
+  readonly trackById = (_index: number, org: Organization): string => org.org_id;
 
   constructor() {
     this.loadOrganizations();

@@ -1,1 +1,3 @@
-/* LoadingSpinnerComponent styles */
+.spinner-border {
+  color: var(--dt-primary);
+}

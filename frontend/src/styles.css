@@ -1,1 +1,48 @@
-/* You can add global styles to this file, and also import other style files */
+/* ── DalTime Design Tokens ── */
+:root {
+  --dt-primary: #1E3A5F;
+  --dt-secondary: #5A7FA5;
+  --dt-tertiary: #A8C8E8;
+
+  --dt-neutral-50: #F8F9FA;
+  --dt-neutral-100: #F1F3F5;
+  --dt-neutral-200: #DEE2E6;
+  --dt-neutral-300: #CED4DA;
+  --dt-neutral-500: #6C757D;
+  --dt-neutral-700: #495057;
+  --dt-neutral-900: #212529;
+}
+
+/* ── Global Brand Overrides ── */
+.btn-primary {
+  background-color: var(--dt-primary);
+  border-color: var(--dt-primary);
+}
+
+.btn-primary:hover,
+.btn-primary:focus-visible {
+  background-color: var(--dt-secondary);
+  border-color: var(--dt-secondary);
+}
+
+.btn-primary:active {
+  background-color: var(--dt-primary);
+  border-color: var(--dt-primary);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--dt-secondary);
+  box-shadow: 0 0 0 0.2rem rgba(90, 127, 165, 0.25);
+}
+
+/*
+ * ── Visual Debug Helper ──
+ * Uncomment the border below to highlight all shared/reusable components.
+ * This makes it easy to verify shared components are used everywhere.
+ * Comment it back out when done testing.
+ */
+.dt-debug {
+  border: 3px solid red;
+  padding: 3px;
+}

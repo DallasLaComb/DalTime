@@ -1,1 +1,7 @@
-/* ConfirmationModalComponent styles */
+.modal-header {
+  border-bottom-color: var(--dt-neutral-200);
+}
+
+.modal-footer {
+  border-top-color: var(--dt-neutral-200);
+}

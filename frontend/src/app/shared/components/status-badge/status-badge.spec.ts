@@ -114,7 +114,7 @@ describe('StatusBadgeComponent', () => {
           componentFixture.componentRef.setInput('colorMap', colorMap);
           componentFixture.detectChanges();
 
-          const expected = colorMap[status] ?? 'bg-secondary';
+          const expected = `dt-debug badge rounded-pill ${colorMap[status] ?? 'bg-secondary'}`;
           const actual = componentFixture.componentInstance.badgeClass();
 
           return actual === expected;

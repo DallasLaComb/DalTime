@@ -1,185 +1,115 @@
-<div class="container-fluid py-3 py-md-4">
+<app-crud-page
+  [title]="orgName() + ' — Org Admins'"
+  actionLabel="+ Register Org Admin"
+  [loading]="loading()"
+  [error]="error()"
+  [empty]="admins().length === 0"
+  emptyTitle="No org admins registered yet"
+  emptyDescription="Register an org admin to manage this organization."
+  (action)="openRegisterModal()"
+  (retry)="load()"
+>
+  <a slot="before-title" routerLink="/web-admin/organizations" class="text-decoration-none text-muted small" data-testid="back-link">← Organizations</a>
 
-  <!-- Page Header -->
-  <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center gap-2 mb-4">
-    <div>
-      <a routerLink="/web-admin/organizations" class="text-decoration-none text-muted small" data-testid="back-link">← Organizations</a>
-      <h2 class="mb-0" data-testid="page-heading">{{ orgName() }} — Org Admins</h2>
+  <app-card-list [data]="admins()" [trackBy]="trackById" [cardTemplate]="adminCard" />
+
+  <ng-template #adminCard let-admin>
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <h6 class="card-title mb-0 fw-semibold" data-testid="admin-name">{{ admin.name }}</h6>
+      <app-status-badge [status]="admin.status" [label]="statusLabel(admin.status)" [colorMap]="statusColorMap" />
     </div>
-    <button class="btn btn-dark w-100 w-sm-auto" data-testid="register-btn" (click)="openRegisterModal()">
-      + Register Org Admin
-    </button>
-  </div>
+    <p class="card-text text-muted mb-2" data-testid="admin-email">{{ admin.email }}</p>
+    <small class="text-muted d-block mb-3">{{ admin.created_at | date: 'mediumDate' }}</small>
+    <app-button variant="danger-outline" size="sm" [fullWidth]="true" testId="delete-btn" (clicked)="openDeleteModal(admin)">Delete</app-button>
+  </ng-template>
 
-  <!-- Loading -->
-  @if (loading()) {
-    <div class="text-center py-5" data-testid="loading-spinner">
-      <div class="spinner-border text-secondary" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-    </div>
-  }
-
-  <!-- Error -->
-  @if (error()) {
-    <div class="alert alert-danger d-flex flex-column flex-sm-row align-items-sm-center gap-2" role="alert" data-testid="error-alert">
-      <span class="flex-grow-1">{{ error() }}</span>
-      <button class="btn btn-sm btn-outline-danger" data-testid="retry-btn" (click)="load()">Retry</button>
-    </div>
-  }
-
-  <!-- Content -->
-  @if (!loading() && !error()) {
-    @if (admins().length === 0) {
-
-      <!-- Empty State -->
-      <div class="text-center py-5 text-muted" data-testid="empty-state">
-        <p class="fs-5 mb-1">No org admins registered yet</p>
-        <p>Register an org admin to manage this organization.</p>
-      </div>
-
-    } @else {
-
-      <!-- Mobile / Tablet: Card List -->
-      <div class="d-lg-none" data-testid="admin-list">
-        @for (admin of admins(); track admin.user_id) {
-          <div class="card mb-3 shadow-sm" data-testid="admin-row">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start mb-1">
-                <h6 class="card-title mb-0 fw-semibold" data-testid="admin-name">{{ admin.name }}</h6>
-                <span class="badge ms-2" [ngClass]="statusClass(admin.status)" data-testid="status-badge">{{ statusLabel(admin.status) }}</span>
-              </div>
-              <p class="card-text text-muted mb-2" data-testid="admin-email">{{ admin.email }}</p>
-              <small class="text-muted d-block mb-3">{{ admin.created_at | date: 'mediumDate' }}</small>
-              <button class="btn btn-sm btn-outline-danger w-100" data-testid="delete-btn" (click)="openDeleteModal(admin)">Delete</button>
-            </div>
-          </div>
-        }
-      </div>
-
-      <!-- Laptop / PC: Table -->
-      <div class="d-none d-lg-block">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th class="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (admin of admins(); track admin.user_id) {
-                <tr data-testid="admin-row">
-                  <td class="fw-semibold" data-testid="admin-name">{{ admin.name }}</td>
-                  <td data-testid="admin-email">{{ admin.email }}</td>
-                  <td>
-                    <span class="badge" [ngClass]="statusClass(admin.status)" data-testid="status-badge">{{ statusLabel(admin.status) }}</span>
-                  </td>
-                  <td class="text-muted">{{ admin.created_at | date: 'mediumDate' }}</td>
-                  <td class="text-end">
-                    <button class="btn btn-sm btn-outline-danger" data-testid="delete-btn" (click)="openDeleteModal(admin)">Delete</button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+  <app-data-table [columns]="columns" [data]="admins()" [trackBy]="trackById">
+    @for (admin of admins(); track admin.user_id) {
+      <tr data-testid="admin-row">
+        <td class="fw-semibold" data-testid="admin-name">{{ admin.name }}</td>
+        <td data-testid="admin-email">{{ admin.email }}</td>
+        <td>
+          <app-status-badge [status]="admin.status" [label]="statusLabel(admin.status)" [colorMap]="statusColorMap" />
+        </td>
+        <td class="text-muted">{{ admin.created_at | date: 'mediumDate' }}</td>
+        <td class="text-end">
+          <app-button variant="danger-outline" size="sm" testId="delete-btn" (clicked)="openDeleteModal(admin)">Delete</app-button>
+        </td>
+      </tr>
     }
-  }
-</div>
+  </app-data-table>
 
-<!-- Register Modal -->
-@if (showModal()) {
-  <div class="modal-backdrop fade show"></div>
-  <div class="modal d-block fade show" tabindex="-1" data-testid="register-modal" (click)="closeModal()">
-    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Register Org Admin</h5>
-          <button type="button" class="btn-close" data-testid="close-modal-btn" (click)="closeModal()"></button>
-        </div>
-        <div class="modal-body">
-          @if (modalError()) {
-            <div class="alert alert-danger py-2" data-testid="modal-error">{{ modalError() }}</div>
-          }
-          <div class="mb-3">
-            <label for="adminName" class="form-label">Name</label>
-            <input type="text" class="form-control form-control-lg" id="adminName" data-testid="name-input"
-              [class.is-invalid]="formSubmitted() && !formName().trim()"
-              [value]="formName()" (input)="formName.set($any($event.target).value)" placeholder="Full name" autocomplete="name" />
-            @if (formSubmitted() && !formName().trim()) {
-              <div class="invalid-feedback" data-testid="name-error">Name is required</div>
-            }
-          </div>
-          <div class="mb-3">
-            <label for="adminEmail" class="form-label">Email</label>
-            <input type="email" class="form-control form-control-lg" id="adminEmail" data-testid="email-input"
-              [class.is-invalid]="formSubmitted() && !formEmail().trim()"
-              [value]="formEmail()" (input)="formEmail.set($any($event.target).value)" placeholder="admin@example.com" autocomplete="email" />
-            @if (formSubmitted() && !formEmail().trim()) {
-              <div class="invalid-feedback" data-testid="email-error">Email is required</div>
-            }
-          </div>
-          <div class="mb-3">
-            <label for="adminPassword" class="form-label">Temporary Password</label>
-            <div class="input-group">
-              <input [type]="showPassword() ? 'text' : 'password'" class="form-control form-control-lg" id="adminPassword" data-testid="password-input"
-                [class.is-invalid]="formSubmitted() && !formPassword().trim()"
-                [value]="formPassword()" (input)="formPassword.set($any($event.target).value)" placeholder="Temporary password" autocomplete="new-password" />
-              <button class="btn btn-outline-secondary" type="button" data-testid="toggle-password-btn" (click)="togglePassword()">
-                {{ showPassword() ? 'Hide' : 'Show' }}
-              </button>
+  <ng-container slot="modals">
+    <!-- Register Modal -->
+    @if (showModal()) {
+      <div class="modal-backdrop fade show"></div>
+      <div class="modal d-block fade show" tabindex="-1" data-testid="register-modal" (click)="closeModal()">
+        <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
+          <div class="modal-content rounded-3 shadow-sm">
+            <div class="modal-header">
+              <h5 class="modal-title fw-semibold">Register Org Admin</h5>
+              <button type="button" class="btn-close" data-testid="close-modal-btn" (click)="closeModal()"></button>
             </div>
-            @if (formSubmitted() && !formPassword().trim()) {
-              <div class="text-danger small mt-1" data-testid="password-error">Temporary password is required</div>
-            }
+            <div class="modal-body">
+              @if (modalError()) {
+                <div class="alert alert-danger py-2" data-testid="modal-error">{{ modalError() }}</div>
+              }
+              <div class="mb-3">
+                <label for="adminName" class="form-label">Name</label>
+                <input type="text" class="form-control form-control-lg" id="adminName" data-testid="name-input"
+                  [class.is-invalid]="formSubmitted() && !formName().trim()"
+                  [value]="formName()" (input)="formName.set($any($event.target).value)" placeholder="Full name" autocomplete="name" />
+                @if (formSubmitted() && !formName().trim()) {
+                  <div class="invalid-feedback" data-testid="name-error">Name is required</div>
+                }
+              </div>
+              <div class="mb-3">
+                <label for="adminEmail" class="form-label">Email</label>
+                <input type="email" class="form-control form-control-lg" id="adminEmail" data-testid="email-input"
+                  [class.is-invalid]="formSubmitted() && !formEmail().trim()"
+                  [value]="formEmail()" (input)="formEmail.set($any($event.target).value)" placeholder="admin@example.com" autocomplete="email" />
+                @if (formSubmitted() && !formEmail().trim()) {
+                  <div class="invalid-feedback" data-testid="email-error">Email is required</div>
+                }
+              </div>
+              <div class="mb-3">
+                <label for="adminPassword" class="form-label">Temporary Password</label>
+                <div class="input-group">
+                  <input [type]="showPassword() ? 'text' : 'password'" class="form-control form-control-lg" id="adminPassword" data-testid="password-input"
+                    [class.is-invalid]="formSubmitted() && !formPassword().trim()"
+                    [value]="formPassword()" (input)="formPassword.set($any($event.target).value)" placeholder="Temporary password" autocomplete="new-password" />
+                  <button class="btn btn-outline-secondary" type="button" data-testid="toggle-password-btn" (click)="togglePassword()">
+                    {{ showPassword() ? 'Hide' : 'Show' }}
+                  </button>
+                </div>
+                @if (formSubmitted() && !formPassword().trim()) {
+                  <div class="text-danger small mt-1" data-testid="password-error">Temporary password is required</div>
+                }
+              </div>
+            </div>
+            <div class="modal-footer flex-column flex-sm-row">
+              <app-button variant="secondary" [fullWidth]="true" testId="cancel-modal-btn" (clicked)="closeModal()">Cancel</app-button>
+              <app-button variant="primary" [fullWidth]="true" [loading]="saving()" testId="save-btn" (clicked)="register()">Register</app-button>
+            </div>
           </div>
         </div>
-        <div class="modal-footer flex-column flex-sm-row">
-          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-modal-btn" (click)="closeModal()">Cancel</button>
-          <button type="button" class="btn btn-dark w-100 w-sm-auto" data-testid="save-btn"
-            [disabled]="saving()" (click)="register()">
-            @if (saving()) {
-              <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-            }
-            Register
-          </button>
-        </div>
       </div>
-    </div>
-  </div>
-}
+    }
 
-<!-- Delete Confirmation Modal -->
-@if (showDeleteModal()) {
-  <div class="modal-backdrop fade show"></div>
-  <div class="modal d-block fade show" tabindex="-1" data-testid="delete-modal" (click)="closeDeleteModal()">
-    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down" (click)="$event.stopPropagation()">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Delete Org Admin</h5>
-          <button type="button" class="btn-close" data-testid="close-delete-modal-btn" (click)="closeDeleteModal()"></button>
-        </div>
-        <div class="modal-body">
-          <p>Are you sure you want to delete <strong data-testid="delete-admin-name">{{ deletingAdmin()?.name }}</strong>
-            (<span data-testid="delete-admin-email">{{ deletingAdmin()?.email }}</span>)?</p>
-          <p class="text-danger mb-0">This will permanently remove their account and cannot be undone.</p>
-        </div>
-        <div class="modal-footer flex-column flex-sm-row">
-          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-testid="cancel-delete-btn" (click)="closeDeleteModal()">Cancel</button>
-          <button type="button" class="btn btn-danger w-100 w-sm-auto" data-testid="confirm-delete-btn" [disabled]="saving()" (click)="confirmDelete()">
-            @if (saving()) {
-              <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-            }
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-}
+    <!-- Delete Confirmation Modal -->
+    <app-confirmation-modal
+      [open]="showDeleteModal()"
+      title="Delete Org Admin"
+      confirmLabel="Delete"
+      confirmStyle="btn btn-danger"
+      [saving]="saving()"
+      (confirm)="confirmDelete()"
+      (cancel)="closeDeleteModal()"
+    >
+      <p>Are you sure you want to delete <strong data-testid="delete-admin-name">{{ deletingAdmin()?.name }}</strong>
+        (<span data-testid="delete-admin-email">{{ deletingAdmin()?.email }}</span>)?</p>
+      <p class="text-danger mb-0">This will permanently remove their account and cannot be undone.</p>
+    </app-confirmation-modal>
+  </ng-container>
+
+</app-crud-page>

@@ -119,7 +119,7 @@ describe('PageHeaderComponent', () => {
 
   // ─── Button styling ───────────────────────────────────────────────────────
 
-  it('applies btn btn-dark classes to the action button', async () => {
+  it('applies btn btn-primary classes to the action button', async () => {
     const fixture = await createComponent();
 
     fixture.componentRef.setInput('actionLabel', 'Action');
@@ -127,6 +127,6 @@ describe('PageHeaderComponent', () => {
 
     const button = query<HTMLButtonElement>(fixture, 'button');
     expect(button.classList.contains('btn')).toBe(true);
-    expect(button.classList.contains('btn-dark')).toBe(true);
+    expect(button.classList.contains('btn-primary')).toBe(true);
   });
 });

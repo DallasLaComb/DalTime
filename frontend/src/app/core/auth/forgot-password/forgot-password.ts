@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ButtonComponent } from '@common-daltime';
 import { AuthService } from '../auth';
 
 @Component({
   selector: 'app-forgot-password',
-  imports: [RouterLink],
+  imports: [RouterLink, ButtonComponent],
   templateUrl: './forgot-password.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

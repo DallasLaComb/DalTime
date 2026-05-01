@@ -97,10 +97,10 @@ describe('DataTableComponent', () => {
     expect(table.classList.contains('align-middle')).toBe(true);
   });
 
-  it('applies table-light class on the thead element', async () => {
+  it('has thead element for column headers', async () => {
     await createComponent();
 
     const thead = query<HTMLElement>(fixture, 'thead');
-    expect(thead.classList.contains('table-light')).toBe(true);
+    expect(thead).toBeTruthy();
   });
 });

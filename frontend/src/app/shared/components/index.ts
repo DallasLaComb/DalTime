@@ -8,3 +8,6 @@ export { CardListComponent } from './card-list/card-list';
 export { ConfirmationModalComponent } from './confirmation-modal/confirmation-modal';
 export { StatusBadgeComponent } from './status-badge/status-badge';
 export { SearchBarComponent } from './search-bar/search-bar';
+export { ButtonComponent } from './button/button';
+export type { ButtonVariant, ButtonSize } from './button/button';
+export { CrudPageComponent } from './crud-page/crud-page';
