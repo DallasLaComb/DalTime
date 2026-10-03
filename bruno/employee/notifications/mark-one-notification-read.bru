@@ -1,0 +1,20 @@
+meta {
+  name: Mark One Notification Read
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{base_url}}/employee/notifications/{{notification_id}}
+  body: none
+  auth: none
+}
+
+docs {
+  notification_id is the composite `<created_at>#<rawId>` value returned by
+  List Notifications, e.g. `2026-06-18T12:00:00.000Z#a1b2c3d4-...`. It MUST be
+  URL-encoded before substitution (encodeURIComponent) since it contains a
+  literal `#` and `:` which are reserved URL characters — an unencoded `#`
+  truncates the path into a client-side fragment and the request never
+  reaches the server.
+}

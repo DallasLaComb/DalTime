@@ -1,0 +1,455 @@
+# Deploys the full stack (backend + frontend) to dev, qa, and main.
+# After a successful deploy, runs Robot Framework E2E tests.
+#
+# Flow (MVP — direct-to-main):
+#   push to main → CI runs → CD polls until CI succeeds on that commit → deploys to main
+#
+# Flow (full pipeline — restore post-MVP):
+#   push to dev → CD polls until CI succeeds on that commit → deploys to dev → E2E
+#   PR dev→qa merged → CD finds last successful dev CI artifact → deploys to qa → E2E
+#   PR qa→main merged → CD finds last successful qa CD artifact → deploys to main → E2E
+# Each environment uses its own AWS role and stack.
+name: CD
+run-name: "CD — ${{ github.ref_name }}"
+
+on:
+  push:
+    branches: [dev, qa, main]
+  workflow_dispatch:
+
+# Cancel any in-progress CD run for the same branch when a new push arrives.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+  deployments: write
+  statuses: write
+
+jobs:
+  # ── Release gate: hard-blocks production deploys on CRITICAL findings only ──
+  # Runs only when deploying to `main` (production). dev/qa promotions skip this
+  # job entirely (the `if` below is false, so `needs.snyk-release-gate.result`
+  # comes back `skipped`, which `deploy` treats as "proceed" — see its `if:`).
+  #
+  # NOTE: lands inert until `secrets.SNYK_TOKEN` / `vars.SNYK_ORG_ID` exist (Phase 1
+  # of docs/snyk-implementation-plan.md). Until then this job will fail auth and
+  # block `main` deploys — set up the secret/var BEFORE this reaches `main`, or
+  # temporarily add `continue-on-error: true` here and remove it once configured.
+  #
+  # "Critical only" is deliberate (see plan Section 5): production is the one place
+  # an actively-exploitable critical vuln justifies blocking a deploy outright, but
+  # a stricter gate here would, in practice, train the team to bypass it — a
+  # calibrated gate people respect beats a strict one people route around.
+  snyk-release-gate:
+    name: Snyk release gate (critical only)
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # For `main`, the artifact-resolution logic above (ci-run) always pins to
+      # `context.sha` (it polls CI on "this exact commit"), so checking out
+      # `github.sha` directly here scans precisely what's about to be deployed —
+      # no need to depend on a step nested inside the `deploy` job.
+      - uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+
+      # Scan each project on its own after `npm ci`, like snyk-pr.yml / snyk-main.yml do.
+      # `snyk test --all-projects` also picked up frontend/android (Gradle), which cannot
+      # resolve without a Capacitor sync and made the gate error out (exit 2) instead of scan.
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      # @daltime/contracts is a file:vendor/contracts dependency; the vendored copy
+      # must exist before `npm ci` in backend/ (see backend/scripts/sync-contracts.mjs).
+      - name: Install contract dependencies
+        run: npm ci
+        working-directory: contracts
+
+      - name: Build and vendor contracts into the backend
+        run: node scripts/sync-contracts.mjs
+        working-directory: backend
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Hard gate — fail the deploy on any CRITICAL finding
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          (cd frontend && snyk test --severity-threshold=critical --org=${{ vars.SNYK_ORG_ID }})
+          (cd backend && snyk test --severity-threshold=critical --org=${{ vars.SNYK_ORG_ID }})
+          snyk iac test infra/template.yaml infra/foundation.yaml --severity-threshold=critical --org=${{ vars.SNYK_ORG_ID }}
+
+  deploy:
+    name: Deploy to ${{ github.ref_name }}
+    needs: [snyk-release-gate]
+    if: always() && (needs.snyk-release-gate.result == 'success' || needs.snyk-release-gate.result == 'skipped')
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: ${{ github.ref_name }}
+
+    environment: ${{ github.ref_name }}
+
+    outputs:
+      api_url: ${{ steps.stack-outputs.outputs.api_url }}
+      cognito_user_pool_id: ${{ steps.foundation.outputs.user_pool_id }}
+      cognito_client_id: ${{ steps.foundation.outputs.client_id }}
+      cognito_region: ${{ steps.foundation.outputs.cognito_region }}
+
+    steps:
+      # ── Resolve which run to pull artifacts from ──
+      #
+      # dev:  poll until CI succeeds on this exact commit, then use that run's artifacts.
+      # qa:   the last successful CI run on dev — CI artifacts are what gets promoted to qa.
+      # main: the last successful CD run on qa — whatever was actually deployed to qa
+      #       is what gets promoted to main, ensuring main always gets qa-verified code.
+      - name: Resolve artifact run ID
+        id: ci-run
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+
+            // ── dev: poll until CI completes on this exact commit ──
+            if (branch === 'dev') {
+              const sha = context.sha;
+              console.log(`Dev — waiting for CI to complete on ${sha}...`);
+
+              for (let attempt = 0; attempt < 60; attempt++) {
+                const runs = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'ci.yml',
+                  head_sha: sha,
+                  per_page: 1
+                });
+
+                if (runs.data.workflow_runs.length > 0) {
+                  const run = runs.data.workflow_runs[0];
+                  if (run.conclusion === 'success') {
+                    console.log(`✓ Dev — CI succeeded: ${run.id} (${sha})`);
+                    core.setOutput('run_id', run.id);
+                    core.setOutput('sha', sha);
+                    return;
+                  } else if (run.conclusion) {
+                    core.setFailed(`CI ended with: ${run.conclusion}`);
+                    return;
+                  }
+                  console.log(`Attempt ${attempt + 1}/60 — CI ${run.status}, waiting 10s...`);
+                } else {
+                  console.log(`Attempt ${attempt + 1}/60 — no CI run found yet, waiting 10s...`);
+                }
+
+                await new Promise(r => setTimeout(r, 10000));
+              }
+
+              core.setFailed('Timed out waiting for CI to complete (10 min)');
+              return;
+            }
+
+            // ── qa: find the last successful CI run on dev ──
+            if (branch === 'qa') {
+              console.log('QA promotion — finding last successful CI run on dev...');
+
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci.yml',
+                branch: 'dev',
+                status: 'success',
+                per_page: 1
+              });
+
+              if (!runs.data.workflow_runs.length) {
+                core.setFailed('No successful CI runs found on dev. Deploy to dev first.');
+                return;
+              }
+
+              const run = runs.data.workflow_runs[0];
+              console.log(`✓ QA — using last successful dev CI run: ${run.id} (${run.head_sha})`);
+              core.setOutput('run_id', run.id);
+              core.setOutput('sha', run.head_sha);
+              return;
+            }
+
+            // ── main: find the last successful CD run on qa, then resolve the CI run
+            //         that qa deployed from (guarantees main always gets qa-verified code).
+            if (branch === 'main') {
+              console.log('Main promotion — finding last successful CD run on qa...');
+
+              const cdRuns = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'cd.yml',
+                branch: 'qa',
+                status: 'success',
+                per_page: 1
+              });
+
+              if (!cdRuns.data.workflow_runs.length) {
+                core.setFailed('No successful CD runs found on qa. Deploy to qa first.');
+                return;
+              }
+
+              // The qa CD run deployed from the last successful CI run on dev.
+              // That CI run uploaded the sam-build and frontend-build artifacts.
+              // Re-resolve it the same way qa does: last successful CI run on dev.
+              const ciRuns = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci.yml',
+                branch: 'dev',
+                status: 'success',
+                per_page: 1
+              });
+
+              if (!ciRuns.data.workflow_runs.length) {
+                core.setFailed('No successful CI runs found on dev. Deploy to dev first.');
+                return;
+              }
+
+              const ciRun = ciRuns.data.workflow_runs[0];
+              const qaCdRun = cdRuns.data.workflow_runs[0];
+              console.log(`✓ Main — using qa CD run ${qaCdRun.id} (${qaCdRun.head_sha}), CI artifacts from dev run ${ciRun.id} (${ciRun.head_sha})`);
+              core.setOutput('run_id', ciRun.id);
+              core.setOutput('sha', ciRun.head_sha);
+            }
+
+      # Clone the exact commit that was built and tested in CI
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ steps.ci-run.outputs.sha }}
+
+      # ── AWS Authentication ──
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # ── Deploy Backend (SAM) ──
+      - name: Download SAM build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sam-build
+          path: backend/.aws-sam/build/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.ci-run.outputs.run_id }}
+
+      - name: Setup SAM CLI
+        uses: aws-actions/setup-sam@89ddb14d60e682855e3fea4be85b3c56485de310 # v3
+
+      - name: Get foundation stack outputs
+        id: foundation
+        run: |
+          OUTPUTS=$(aws cloudformation describe-stacks \
+            --stack-name daltime-foundation-${BRANCH} \
+            --region us-east-1 \
+            --query "Stacks[0].Outputs" \
+            --output json)
+
+          get() { echo "$OUTPUTS" | jq -r --arg k "$1" '.[] | select(.OutputKey==$k) | .OutputValue'; }
+
+          echo "bucket_name=$(get BucketName)"             >> "$GITHUB_OUTPUT"
+          echo "distribution_id=$(get DistributionId)"     >> "$GITHUB_OUTPUT"
+          echo "user_pool_id=$(get UserPoolId)"             >> "$GITHUB_OUTPUT"
+          echo "client_id=$(get UserPoolClientId)"          >> "$GITHUB_OUTPUT"
+          echo "cognito_domain=$(get CognitoDomain)"        >> "$GITHUB_OUTPUT"
+          echo "cognito_region=$(get CognitoRegion)"        >> "$GITHUB_OUTPUT"
+
+          echo "✓ Foundation outputs resolved for daltime-foundation-${BRANCH}"
+
+      - name: Deploy SAM stack
+        run: |
+          PARAM_OVERRIDES="AllowedOrigins=${{ vars.ALLOWED_ORIGINS }} CognitoUserPoolId=${{ steps.foundation.outputs.user_pool_id }} CognitoClientId=${{ steps.foundation.outputs.client_id }} LogRetentionDays=${{ vars.LOG_RETENTION_DAYS || '14' }} LogLevel=${{ vars.LOG_LEVEL || 'INFO' }} AppEnvironment=${{ github.ref_name == 'main' && 'prod' || github.ref_name }}"
+          if [ -n "${{ vars.AlertEmail }}" ]; then
+            PARAM_OVERRIDES="$PARAM_OVERRIDES AlertEmail=${{ vars.AlertEmail }}"
+          fi
+          sam deploy \
+            --template-file .aws-sam/build/template.yaml \
+            --stack-name ${{ vars.SAM_STACK_NAME }} \
+            --s3-bucket ${{ vars.SAM_S3_BUCKET }} \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --region us-east-1 \
+            --parameter-overrides $PARAM_OVERRIDES
+        working-directory: backend
+
+      - name: Get API URL from stack outputs
+        id: stack-outputs
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ vars.SAM_STACK_NAME }} \
+            --region us-east-1 \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
+            --output text)
+          echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
+          echo "✓ API URL resolved from stack: ${API_URL}"
+
+      # ── Deploy Frontend ──
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: frontend-build
+          path: frontend/dist/frontend/browser/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.ci-run.outputs.run_id }}
+
+      - name: Replace environment placeholders
+        env:
+          API_BASE_URL: ${{ steps.stack-outputs.outputs.api_url }}
+          COGNITO_USER_POOL_ID: ${{ steps.foundation.outputs.user_pool_id }}
+          COGNITO_CLIENT_ID: ${{ steps.foundation.outputs.client_id }}
+          COGNITO_REGION: ${{ steps.foundation.outputs.cognito_region }}
+          COGNITO_DOMAIN: ${{ steps.foundation.outputs.cognito_domain }}
+          # Not secret (ships in the public bundle either way) — vars, not secrets. Empty when unset
+          # is fine: PosthogService treats a blank apiKey as disabled, so a missing var never breaks a deploy.
+          POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
+        run: |
+          find frontend/dist/frontend/browser \( -name "*.html" -o -name "*.js" -o -name "*.txt" \) -type f -exec sed -i \
+            -e "s|__API_BASE_URL__|${API_BASE_URL}|g" \
+            -e "s|__VITE_COGNITO_USER_POOL_ID__|${COGNITO_USER_POOL_ID}|g" \
+            -e "s|__VITE_COGNITO_CLIENT_ID__|${COGNITO_CLIENT_ID}|g" \
+            -e "s|__VITE_COGNITO_REGION__|${COGNITO_REGION}|g" \
+            -e "s|__VITE_POSTHOG_KEY__|${POSTHOG_KEY}|g" \
+            -e "s|__VITE_POSTHOG_HOST__|${POSTHOG_HOST}|g" \
+            -e "s|__VITE_COGNITO_DOMAIN__|${COGNITO_DOMAIN}|g" \
+            {} +
+
+          echo "✓ Placeholders replaced:"
+          echo "  API_BASE_URL: ${API_BASE_URL}"
+          echo "  COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:0:10}..."
+          echo "  COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:0:10}..."
+          echo "  COGNITO_REGION: ${COGNITO_REGION}"
+          echo "  COGNITO_DOMAIN: ${COGNITO_DOMAIN}"
+          if [ -n "${POSTHOG_KEY}" ]; then
+            echo "  POSTHOG_KEY: set (${#POSTHOG_KEY} chars)"
+          else
+            echo "  POSTHOG_KEY: <unset, PostHog disabled>"
+          fi
+          echo "  POSTHOG_HOST: ${POSTHOG_HOST}"
+
+      - name: Sync frontend to S3
+        run: |
+          # Upload all hashed assets with long-lived cache headers (1 year).
+          # index.html is excluded here and uploaded separately with no-cache
+          # headers so browsers always fetch the latest shell on every page
+          # load — preventing stale chunk references after a deploy.
+          aws s3 sync frontend/dist/frontend/browser/ \
+            s3://${{ steps.foundation.outputs.bucket_name }}/ \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "max-age=31536000,immutable"
+
+          # Upload index.html with no-cache so every browser request fetches
+          # the current version. This is the entry point that references all
+          # hashed chunk filenames, so it must never be served stale.
+          aws s3 cp frontend/dist/frontend/browser/index.html \
+            s3://${{ steps.foundation.outputs.bucket_name }}/index.html \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --content-type "text/html"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.foundation.outputs.distribution_id }} \
+            --paths "/*"
+
+      - name: Report deployment success
+        if: success()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const deployRef = context.sha;
+
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: deployRef,
+              environment: branch,
+              auto_merge: false,
+              required_contexts: []
+            });
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'success',
+              environment_url: `https://github.com/${context.repo.owner}/${context.repo.repo}`,
+              description: 'Deployment successful'
+            });
+
+  # ── Post-deploy smoke tests ──────────────────────────────────────────────────
+  # Prerequisite: seed users must exist in the target environment's Cognito user
+  # pool before this job can pass. Run backend/scripts/seed-dev.mjs against the
+  # environment first. For qa and prod, either extend seed-dev.mjs or run a
+  # parallel seed targeting those pools — document this step before enabling
+  # this job for qa or prod by expanding the `if:` guard below to include them.
+  #
+  # Currently scoped to dev only (if: always() + deploy.result==success + github.ref_name=='dev') per the
+  # initial rollout decision. The job will be expanded to qa/main once those
+  # environments are manually seeded and the USER_PASSWORD_AUTH flow is confirmed
+  # enabled on their Cognito App Clients.
+  #
+  # Required GitHub Actions secrets/variables in the `dev` environment:
+  #   secrets.E2E_SEED_USER_PASSWORD — shared password for all seeded smoke users
+  #   vars.FRONTEND_BASE_URL         — e.g. https://dev.daltime.com
+  #   (API URL, Cognito client/pool/region are passed through from the deploy job)
+  post-deploy:
+    name: Smoke tests — ${{ github.ref_name }}
+    needs: [deploy]
+    if: always() && needs.deploy.result == 'success' && github.ref_name == 'dev'
+    runs-on: ubuntu-latest
+
+    environment: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install e2e dependencies
+        run: npm ci
+        working-directory: e2e
+
+      - name: Run smoke tests
+        env:
+          FRONTEND_BASE_URL: ${{ vars.FRONTEND_BASE_URL }}
+          API_BASE_URL: ${{ needs.deploy.outputs.api_url }}
+          COGNITO_CLIENT_ID: ${{ needs.deploy.outputs.cognito_client_id }}
+          COGNITO_USER_POOL_ID: ${{ needs.deploy.outputs.cognito_user_pool_id }}
+          COGNITO_REGION: ${{ needs.deploy.outputs.cognito_region }}
+          E2E_SEED_USER_PASSWORD: ${{ secrets.E2E_SEED_USER_PASSWORD }}
+        run: npm test
+        working-directory: e2e

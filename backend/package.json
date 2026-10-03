@@ -1,0 +1,50 @@
+{
+  "name": "daltime-backend",
+  "version": "1.0.0",
+  "description": "DalTime scheduling application backend - AWS Lambda functions",
+  "type": "module",
+  "scripts": {
+    "contracts:build": "node scripts/sync-contracts.mjs",
+    "pretest": "npm run contracts:build",
+    "prebuild": "npm run contracts:build",
+    "test": "vitest run --project unit",
+    "test:ci": "vitest run --project unit --coverage",
+    "test:integration": "vitest run --project integration",
+    "build": "PATH=\"$PATH:$(pwd)/node_modules/.bin\" sam build --template-file ../infra/template.yaml",
+    "start": "npm run contracts:build && PATH=\"$PATH:$(pwd)/node_modules/.bin\" sam build --template-file ../infra/template.yaml && sam local start-api --template-file .aws-sam/build/template.yaml --port 47200 --profile daltime-dev --env-vars env.local.json",
+    "deploy": "sam deploy --guided",
+    "lint": "eslint src",
+    "typecheck:tests": "tsc -p tsconfig.test.json"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "sam",
+    "serverless"
+  ],
+  "author": "Dallas LaComb",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-lambda-powertools/logger": "2.35.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1024.0",
+    "@aws-sdk/client-dynamodb": "^3.995.0",
+    "@aws-sdk/lib-dynamodb": "^3.995.0",
+    "@daltime/contracts": "file:vendor/contracts"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.160",
+    "@types/node": "^25.3.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "aws-sdk-client-mock": "^4.1.0",
+    "aws-sdk-client-mock-vitest": "^7.0.1",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.3.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^4.1.11"
+  }
+}

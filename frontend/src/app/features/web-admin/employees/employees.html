@@ -1,0 +1,70 @@
+<app-crud-page
+  title="Employees"
+  [loading]="loading()"
+  [error]="error()"
+  [empty]="allEmployees().length === 0"
+  emptyTitle="No employees found"
+  emptyDescription="Employees will appear here once they are registered by an Org Admin."
+  (retry)="load()"
+>
+  <a
+    slot="before-title"
+    routerLink="/web-admin"
+    class="text-sm text-gray-500 hover:text-dt-primary no-underline transition-colors"
+    data-testid="back-link"
+    >← Dashboard</a
+  >
+
+  <div class="mb-4">
+    <app-search-bar
+      placeholder="Search by name, email, or organization…"
+      ariaLabel="Search employees"
+      data-testid="employee-search"
+      (searchChange)="onSearch($event)"
+    />
+  </div>
+
+  @if (allEmployees().length > 0 && employees().length === 0) {
+    <p class="text-sm text-gray-500 text-center py-6" data-testid="no-results">
+      No employees match your search.
+    </p>
+  }
+
+  <app-card-list [data]="employees()" [trackBy]="trackById" [cardTemplate]="employeeCard" />
+
+  <ng-template #employeeCard let-emp>
+    <div class="flex justify-between items-start mb-1">
+      <h6 class="text-base font-semibold text-gray-900 mb-0" data-testid="employee-name">
+        {{ emp.first_name }} {{ emp.last_name }}
+      </h6>
+      <app-status-badge
+        [status]="emp.status"
+        [label]="statusLabel(emp.status)"
+        [colorMap]="statusColorMap"
+      />
+    </div>
+    <p class="text-sm text-gray-500 mb-1" data-testid="employee-email">{{ emp.email }}</p>
+    <p class="text-sm text-gray-500 mb-2" data-testid="employee-org">{{ emp.org_name }}</p>
+    <small class="text-gray-400 block">{{ emp.created_at | date: 'mediumDate' }}</small>
+  </ng-template>
+
+  <app-data-table [columns]="columns" [data]="employees()" [trackBy]="trackById">
+    @for (emp of employees(); track emp.employee_id) {
+      <tr class="hover:bg-gray-50" data-testid="employee-row">
+        <td class="px-4 py-3 font-semibold text-gray-900" data-testid="employee-name">
+          {{ emp.first_name }} {{ emp.last_name }}
+        </td>
+        <td class="px-4 py-3 text-gray-700" data-testid="employee-email">{{ emp.email }}</td>
+        <td class="px-4 py-3 text-gray-700" data-testid="employee-org">{{ emp.org_name }}</td>
+        <td class="px-4 py-3">
+          <app-status-badge
+            [status]="emp.status"
+            [label]="statusLabel(emp.status)"
+            [colorMap]="statusColorMap"
+          />
+        </td>
+        <td class="px-4 py-3 text-gray-500">{{ emp.created_at | date: 'mediumDate' }}</td>
+      </tr>
+    }
+  </app-data-table>
+</app-crud-page>

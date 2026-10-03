@@ -1,0 +1,108 @@
+<app-crud-page
+  title="My Employees"
+  actionLabel="+ Register Employee"
+  [loading]="loading()"
+  [error]="error()"
+  [empty]="employees().length === 0"
+  emptyTitle="No employees yet"
+  emptyDescription="Register an employee to get started."
+  (action)="openRegisterModal()"
+  (retry)="load()"
+>
+  <app-status-filter
+    [value]="statusFilter()"
+    [counts]="statusCounts()"
+    noun="employees"
+    (changed)="setStatusFilter($event)"
+  />
+
+  @if (filteredEntities().length === 0) {
+    <app-empty-state
+      [title]="nothingMatchingText()"
+      description="Try another status."
+      data-testid="status-filter-empty"
+    />
+  } @else {
+    <app-card-list
+      [data]="filteredEntities()"
+      [trackBy]="trackById"
+      [cardTemplate]="employeeCard"
+    />
+
+    <ng-template #employeeCard let-employee>
+      <app-employee-card-header [employee]="employee" />
+      <app-employee-actions
+        [status]="employee.status"
+        layout="card"
+        (editRequested)="openEditModal(employee)"
+        (disableRequested)="openDisableModal(employee)"
+        (enableRequested)="openEnableModal(employee)"
+      />
+    </ng-template>
+
+    <app-data-table [columns]="columns" [data]="filteredEntities()" [trackBy]="trackById">
+      @for (employee of filteredEntities(); track employee.employee_id) {
+        <tr class="hover:bg-gray-50" data-testid="employee-row">
+          <td class="px-4 py-3 font-semibold text-gray-900" data-testid="employee-name">
+            {{ employee.first_name }} {{ employee.last_name }}
+          </td>
+          <td class="px-4 py-3 text-gray-700" data-testid="employee-email">{{ employee.email }}</td>
+          <td class="px-4 py-3 text-gray-700" data-testid="employee-phone">
+            <app-phone-display [phone]="employee.phone" />
+          </td>
+          <td class="px-4 py-3">
+            <app-status-badge
+              [status]="employee.status"
+              [label]="statusLabel(employee.status)"
+              [colorMap]="statusColorMap"
+            />
+          </td>
+          <td class="px-4 py-3 text-gray-500">{{ employee.created_at | date: 'mediumDate' }}</td>
+          <td class="px-4 py-3 text-right">
+            <app-employee-actions
+              [status]="employee.status"
+              layout="table"
+              (editRequested)="openEditModal(employee)"
+              (disableRequested)="openDisableModal(employee)"
+              (enableRequested)="openEnableModal(employee)"
+            />
+          </td>
+        </tr>
+      }
+    </app-data-table>
+  }
+
+  <ng-container slot="modals">
+    <app-register-employee-modal
+      [open]="showRegisterModal()"
+      [saving]="saving()"
+      [error]="modalError()"
+      (cancelled)="closeRegisterModal()"
+      (registered)="handleRegister($event)"
+    />
+
+    <app-edit-employee-modal
+      [open]="showEditModal()"
+      [saving]="saving()"
+      [error]="editError()"
+      [initial]="editingEmployee()"
+      (cancelled)="closeEditModal()"
+      (saved)="handleSaveEdit($event)"
+    />
+
+    <app-employee-status-modals
+      [showDisableModal]="showDisableModal()"
+      [showEnableModal]="showEnableModal()"
+      [disablingEmployee]="disablingEntity()"
+      [enablingEmployee]="enablingEntity()"
+      [saving]="saving()"
+      [disableError]="disableError()"
+      [disableNeedsAcknowledgement]="disableNeedsAcknowledgement()"
+      [enableError]="enableError()"
+      (disableConfirmed)="confirmDisable()"
+      (disableCancelled)="closeDisableModal()"
+      (enableConfirmed)="confirmEnable()"
+      (enableCancelled)="closeEnableModal()"
+    />
+  </ng-container>
+</app-crud-page>

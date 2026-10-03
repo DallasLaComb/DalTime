@@ -1,0 +1,112 @@
+<div class="max-w-2xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">My Profile</h1>
+
+  @if (loading()) {
+    <div class="flex justify-center py-16">
+      <output class="dt-spinner text-dt-primary"></output>
+    </div>
+  } @else if (error()) {
+    <div
+      class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4"
+      data-testid="profile-error"
+    >
+      {{ error() }}
+    </div>
+    <app-button variant="secondary" (clicked)="load()">Retry</app-button>
+  } @else if (profile()) {
+    @if (saveSuccess()) {
+      <div
+        class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 mb-4"
+        data-testid="save-success"
+      >
+        Profile updated successfully.
+      </div>
+    }
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+      <!-- Email (read-only) -->
+      <div class="px-6 py-4 flex justify-between items-center">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Email</p>
+          <p class="text-sm text-gray-900 mb-0" data-testid="profile-email">
+            {{ profile()!.email }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Name -->
+      <div class="px-6 py-4">
+        @if (editing()) {
+          <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Name</p>
+          @if (saveError()) {
+            <div
+              class="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800 mb-3"
+              data-testid="save-error"
+            >
+              {{ saveError() }}
+            </div>
+          }
+          <input
+            type="text"
+            class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary mb-1"
+            [class.input-error]="editSubmitted() && !editName().trim()"
+            data-testid="edit-name-input"
+            [value]="editName()"
+            (input)="editName.set($any($event.target).value)"
+            autocomplete="name"
+          />
+          @if (editSubmitted() && !editName().trim()) {
+            <p class="input-feedback" data-testid="name-error">Name is required</p>
+          }
+          <div class="flex gap-2 mt-3">
+            <app-button
+              variant="secondary"
+              size="sm"
+              testId="cancel-edit-btn"
+              (clicked)="cancelEdit()"
+              >Cancel</app-button
+            >
+            <app-button
+              variant="primary"
+              size="sm"
+              [loading]="saving()"
+              testId="save-btn"
+              (clicked)="save()"
+              >Save</app-button
+            >
+          </div>
+        } @else {
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+                Name
+              </p>
+              <p class="text-sm text-gray-900 mb-0" data-testid="profile-name">
+                {{ profile()!.name }}
+              </p>
+            </div>
+            <app-button
+              variant="primary-outline"
+              size="sm"
+              testId="edit-btn"
+              (clicked)="startEdit()"
+              >Edit</app-button
+            >
+          </div>
+        }
+      </div>
+
+      <!-- Org ID (read-only) -->
+      <div class="px-6 py-4 flex justify-between items-center">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+            Organization ID
+          </p>
+          <p class="text-sm text-gray-500 font-mono mb-0" data-testid="profile-org-id">
+            {{ profile()!.org_id }}
+          </p>
+        </div>
+      </div>
+    </div>
+  }
+</div>

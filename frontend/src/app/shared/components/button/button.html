@@ -1,0 +1,13 @@
+<button
+  [class]="btnClass()"
+  [type]="type()"
+  [disabled]="isDisabled()"
+  [attr.data-testid]="testId()"
+  [attr.aria-label]="ariaLabel()"
+  (click)="clicked.emit()"
+>
+  @if (loading()) {
+    <output class="dt-spinner-sm"></output>
+  }
+  <ng-content />
+</button>

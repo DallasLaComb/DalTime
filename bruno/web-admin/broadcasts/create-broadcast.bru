@@ -1,0 +1,20 @@
+meta {
+  name: Create Broadcast
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/web-admin/broadcasts
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "message": "There is an expected maintenance tonight between 9pm-10pm ET. Expect potential downtime during this window.",
+    "severity": "WARNING",
+    "target_scope": "ALL",
+    "expires_at": "2099-01-01T03:00:00.000Z"
+  }
+}

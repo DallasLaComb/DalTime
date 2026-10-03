@@ -1,0 +1,45 @@
+meta {
+  name: Cancel Swap Shift (Unpost)
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{base_url}}/employee/swap-shifts/{{swap_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{employee_token}}
+}
+
+docs {
+  Cancels (unpost) a swap listing the caller owns.
+  The SWAP# record status changes to 'cancelled' — the record is NOT deleted,
+  preserving audit history. The listing disappears from the "Available to Take"
+  panel automatically because the GSI1SK prefix changes from STATUS#open# to
+  STATUS#cancelled#.
+
+  Path param: swapId — the UUID of the swap listing to cancel
+
+  Validation:
+  - Swap listing must exist in caller's org (404 if not found)
+  - Caller must be the original poster (403 if not)
+  - Swap listing must still be 'open' (409 if already claimed or cancelled)
+
+  Response 204 (success — no body):
+  (empty)
+
+  Response 403 (not the original poster):
+  { "error": "You can only cancel your own swap listings" }
+
+  Response 404 (swap listing not found):
+  { "error": "Swap listing not found" }
+
+  Response 409 (listing not open):
+  { "error": "This swap listing is no longer open and cannot be cancelled" }
+
+  Response 500 (unexpected server error):
+  { "error": "An unexpected error occurred" }
+}

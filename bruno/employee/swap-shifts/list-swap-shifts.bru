@@ -1,0 +1,73 @@
+meta {
+  name: List Swap Shifts (Available + Mine)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/employee/swap-shifts
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{employee_token}}
+}
+
+docs {
+  Returns two arrays for the swap-shifts UI:
+    - available: open swap listings posted by OTHER employees in the caller's org
+    - mine: all swap listings posted by the caller (all statuses: open/claimed/cancelled)
+
+  Response 200:
+  {
+    "available": [
+      {
+        "swap_id": "550e8400-e29b-41d4-a716-446655440000",
+        "org_id": "org-abc123",
+        "shift_id": "shift-xyz",
+        "posted_by_employee_id": "emp-other",
+        "posted_by_employee_name": "Jane Doe",
+        "manager_id": "mgr-001",
+        "status": "open",
+        "claimed_by_employee_id": null,
+        "claimed_by_employee_name": null,
+        "date": "2026-07-01",
+        "start_time": "09:00",
+        "end_time": "17:00",
+        "type": "morning",
+        "location_id": "loc-1",
+        "location_name": "Main Floor",
+        "created_at": "2026-06-19T14:30:00.000Z",
+        "updated_at": "2026-06-19T14:30:00.000Z"
+      }
+    ],
+    "mine": [
+      {
+        "swap_id": "660e8400-e29b-41d4-a716-446655440001",
+        "org_id": "org-abc123",
+        "shift_id": "shift-abc",
+        "posted_by_employee_id": "emp-caller",
+        "posted_by_employee_name": "John Smith",
+        "manager_id": "mgr-001",
+        "status": "open",
+        "claimed_by_employee_id": null,
+        "claimed_by_employee_name": null,
+        "date": "2026-07-05",
+        "start_time": "14:00",
+        "end_time": "22:00",
+        "type": "afternoon",
+        "location_id": "loc-2",
+        "location_name": "Back Office",
+        "created_at": "2026-06-19T10:00:00.000Z",
+        "updated_at": "2026-06-19T10:00:00.000Z"
+      }
+    ]
+  }
+
+  Response 403 (not Employee role or caller not provisioned):
+  { "error": "Employee role required" }
+
+  Response 500 (unexpected server error):
+  { "error": "An unexpected error occurred" }
+}

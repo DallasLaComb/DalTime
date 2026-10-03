@@ -1,0 +1,19 @@
+meta {
+  name: Update Manager
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{base_url}}/org-admin/managers/{{manager_id}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "phone": "555-987-6543"
+  }
+}

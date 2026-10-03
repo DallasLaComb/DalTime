@@ -1,0 +1,139 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: Deploy to Dev",
+      "type": "shell",
+      "command": "sam build --template-file ../infra/template.yaml && sam deploy --template-file .aws-sam/build/template.yaml --stack-name daltime-backend-dev --s3-bucket daltime-sam-artifacts --capabilities CAPABILITY_IAM --no-confirm-changeset --no-fail-on-empty-changeset --region us-east-1 --profile daltime-dev --parameter-overrides 'AllowedOrigins=http://localhost:4200,https://dev.daltime.com,https://localhost' CognitoUserPoolId=us-east-1_kzQ806uSv CognitoClientId=1nl13tbaqb47s8f0tfc07lc24m LogRetentionDays=14 LogLevel=DEBUG AppEnvironment=dev",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "dependsOn": ["AWS: Ensure SSO Login"]
+    },
+    {
+      "label": "AWS: Ensure SSO Login",
+      "type": "shell",
+      "command": "if (aws sts get-caller-identity --profile daltime-dev 2>$null) { Write-Host 'AWS SSO session is active.' } else { Write-Host ''; Write-Host 'AWS SSO session expired or not logged in.'; Write-Host 'Run: aws sso login --sso-session daltime'; Write-Host ''; exit 1 }",
+      "options": {
+        "shell": {
+          "executable": "powershell",
+          "args": ["-NoProfile", "-Command"]
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Backend: Validate SAM Template",
+      "type": "shell",
+      "command": "sam validate --template ../infra/template.yaml",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+
+    {
+      "label": "Backend: Install Dependencies",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Frontend: Install Dependencies",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Frontend: Start Dev Server",
+      "type": "shell",
+      "command": "npm start",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^.*$",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Initial chunk files",
+          "endsPattern": "Compiled successfully"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      }
+    },
+    {
+      "label": "Install All Dependencies",
+      "dependsOn": [
+        "Backend: Install Dependencies",
+        "Frontend: Install Dependencies"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Start Full Stack (with install)",
+      "dependsOn": [
+        "Install All Dependencies",
+        "Frontend: Start Dev Server"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Start Full Stack",
+      "dependsOn": [
+        "Frontend: Start Dev Server"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

@@ -1,0 +1,431 @@
+<div class="w-full px-3 py-4 md:px-4 md:py-6">
+  <!-- ── Page header ──────────────────────────────────────────────────────── -->
+  <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <h2 class="text-2xl font-bold text-neutral-900">Swap Shifts</h2>
+      <p class="text-sm text-neutral-500">
+        Post your shifts for coworkers to take, or claim available shifts
+      </p>
+    </div>
+    <app-button variant="primary" size="md" testId="post-shift-btn" (clicked)="openPostModal()">
+      Post a Shift
+    </app-button>
+  </div>
+
+  <!-- ── Tabs ──────────────────────────────────────────────────────────────── -->
+  <div role="tablist" aria-label="Swap shifts panels" class="mb-5 flex border-b border-neutral-200">
+    <button
+      role="tab"
+      type="button"
+      [attr.aria-selected]="activeTab() === 'available'"
+      [attr.aria-controls]="'panel-available'"
+      id="tab-available"
+      data-testid="tab-available"
+      tabindex="0"
+      [class]="
+        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ' +
+        (activeTab() === 'available'
+          ? 'border-primary text-primary'
+          : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300')
+      "
+      (click)="setTab('available')"
+      (keydown.enter)="setTab('available')"
+      (keydown.space)="setTab('available')"
+    >
+      Available to Take
+    </button>
+    <button
+      role="tab"
+      type="button"
+      [attr.aria-selected]="activeTab() === 'mine'"
+      [attr.aria-controls]="'panel-mine'"
+      id="tab-mine"
+      data-testid="tab-mine"
+      tabindex="0"
+      [class]="
+        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ' +
+        (activeTab() === 'mine'
+          ? 'border-primary text-primary'
+          : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300')
+      "
+      (click)="setTab('mine')"
+      (keydown.enter)="setTab('mine')"
+      (keydown.space)="setTab('mine')"
+    >
+      My Posted Shifts
+    </button>
+  </div>
+
+  <!-- ── Live region for success/error banners (read by screen readers) ──── -->
+  <div aria-live="polite" aria-atomic="true" class="sr-only" data-testid="live-region">
+    @if (claimSuccess()) {
+      {{ claimSuccess() }}
+    }
+    @if (claimError()) {
+      {{ claimError() }}
+    }
+    @if (cancelSuccess()) {
+      {{ cancelSuccess() }}
+    }
+    @if (cancelError()) {
+      {{ cancelError() }}
+    }
+    @if (postSuccess()) {
+      {{ postSuccess() }}
+    }
+    @if (postError()) {
+      {{ postError() }}
+    }
+  </div>
+
+  <!-- ── Loading state (both panels share the same load call) ────────────── -->
+  @if (loading()) {
+    <app-loading-spinner />
+  } @else if (listError()) {
+    <app-error-alert [message]="listError()!" />
+  } @else {
+    <!-- ══════════════════ AVAILABLE TO TAKE PANEL ═════════════════════ -->
+    <div
+      id="panel-available"
+      role="tabpanel"
+      aria-labelledby="tab-available"
+      [hidden]="activeTab() !== 'available'"
+    >
+      <!-- Success/error banners for claim actions -->
+      @if (claimSuccess()) {
+        <div
+          role="status"
+          class="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800"
+          data-testid="claim-success-banner"
+        >
+          {{ claimSuccess() }}
+        </div>
+      }
+      @if (claimError()) {
+        <div
+          role="alert"
+          class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700"
+          data-testid="claim-error-banner"
+        >
+          {{ claimError() }}
+        </div>
+      }
+
+      @if (available().length === 0) {
+        <app-empty-state
+          title="No shifts available"
+          description="There are no open shifts posted for swap by your coworkers right now."
+        />
+      } @else {
+        <div class="flex flex-col gap-3" role="list" aria-label="Available shifts to claim">
+          @for (swap of available(); track trackBySwapId($index, swap)) {
+            <div
+              role="listitem"
+              class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center"
+              [attr.data-testid]="'available-swap-card-' + swap.swap_id"
+            >
+              <!-- Shift info -->
+              <div class="min-w-0 flex-1">
+                <p class="font-semibold text-neutral-900">
+                  {{ swap.location_name || 'Location TBD' }}
+                </p>
+                <p class="mt-0.5 text-sm text-neutral-600 capitalize">
+                  {{ formatDate(swap.date) }} · {{ formatTime(swap.start_time) }} –
+                  {{ formatTime(swap.end_time) }} · {{ swap.type }} shift
+                </p>
+                <p class="mt-1 text-xs text-neutral-400">
+                  Posted by {{ swap.posted_by_employee_name }}
+                </p>
+              </div>
+
+              <!-- Claim button — opens confirmation modal before sending the request -->
+              <div class="shrink-0 self-start sm:self-auto">
+                <app-button
+                  variant="primary"
+                  size="sm"
+                  [testId]="'claim-shift-' + swap.swap_id"
+                  [loading]="claimingId() === swap.swap_id"
+                  [disabled]="claimingId() !== null"
+                  (clicked)="openClaimModal(swap.swap_id)"
+                >
+                  Claim
+                </app-button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- ══════════════════ MY POSTED SHIFTS PANEL ══════════════════════ -->
+    <div
+      id="panel-mine"
+      role="tabpanel"
+      aria-labelledby="tab-mine"
+      [hidden]="activeTab() !== 'mine'"
+    >
+      <!-- Success/error banners for cancel + post actions -->
+      @if (cancelSuccess()) {
+        <div
+          role="status"
+          class="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800"
+          data-testid="cancel-success-banner"
+        >
+          {{ cancelSuccess() }}
+        </div>
+      }
+      @if (cancelError()) {
+        <div
+          role="alert"
+          class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700"
+          data-testid="cancel-error-banner"
+        >
+          {{ cancelError() }}
+        </div>
+      }
+      @if (postSuccess()) {
+        <div
+          role="status"
+          class="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800"
+          data-testid="post-success-banner"
+        >
+          {{ postSuccess() }}
+        </div>
+      }
+      @if (postError()) {
+        <div
+          role="alert"
+          class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700"
+          data-testid="post-error-banner"
+        >
+          {{ postError() }}
+        </div>
+      }
+
+      @if (mine().length === 0) {
+        <app-empty-state
+          title="No posted shifts"
+          description="You haven't posted any shifts for swap yet. Use the 'Post a Shift' button to get started."
+        />
+      } @else {
+        <div class="flex flex-col gap-3" role="list" aria-label="My posted swap shifts">
+          @for (swap of mine(); track trackBySwapId($index, swap)) {
+            <div
+              role="listitem"
+              class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center"
+              [attr.data-testid]="'mine-swap-card-' + swap.swap_id"
+            >
+              <!-- Shift info -->
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="font-semibold text-neutral-900">
+                    {{ swap.location_name || 'Location TBD' }}
+                  </p>
+                  <!-- Status badge -->
+                  <app-status-badge
+                    [status]="swap.status"
+                    [label]="swap.status"
+                    [colorMap]="swapStatusColorMap"
+                    [attr.data-testid]="'swap-status-badge-' + swap.swap_id"
+                  />
+                </div>
+                <p class="mt-0.5 text-sm text-neutral-600 capitalize">
+                  {{ formatDate(swap.date) }} · {{ formatTime(swap.start_time) }} –
+                  {{ formatTime(swap.end_time) }} · {{ swap.type }} shift
+                </p>
+                @if (swap.status === 'claimed' && swap.claimed_by_employee_name) {
+                  <p class="mt-1 text-xs text-green-700">
+                    Claimed by {{ swap.claimed_by_employee_name }}
+                  </p>
+                }
+                @if (swap.status === 'cancelled') {
+                  <p class="mt-1 text-xs text-neutral-400">This listing was cancelled</p>
+                }
+              </div>
+
+              <!-- Cancel button — only shown for open listings -->
+              @if (swap.status === 'open') {
+                <div class="shrink-0 self-start sm:self-auto">
+                  <app-button
+                    variant="danger-outline"
+                    size="sm"
+                    [testId]="'cancel-swap-' + swap.swap_id"
+                    (clicked)="openCancelModal(swap.swap_id)"
+                  >
+                    Cancel
+                  </app-button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ══════════════════ CLAIM CONFIRMATION MODAL ═══════════════════════ -->
+  <app-confirmation-modal
+    [open]="claimModalOpen()"
+    title="Claim Shift"
+    confirmLabel="Yes, Claim Shift"
+    confirmVariant="primary"
+    [saving]="claiming()"
+    (confirmed)="confirmClaim()"
+    (cancelled)="closeClaimModal()"
+    data-testid="claim-confirmation-modal"
+  >
+    <p class="text-neutral-700">
+      Are you sure you want to claim this shift? It will be transferred to you and the listing will
+      be removed from the available shifts board.
+    </p>
+  </app-confirmation-modal>
+
+  <!-- ══════════════════ CANCEL CONFIRMATION MODAL ══════════════════════ -->
+  <app-confirmation-modal
+    [open]="cancelModalOpen()"
+    title="Cancel Swap Listing"
+    confirmLabel="Yes, Cancel Listing"
+    confirmVariant="danger"
+    [saving]="cancelling()"
+    (confirmed)="confirmCancel()"
+    (cancelled)="closeCancelModal()"
+  >
+    <p class="text-neutral-700">
+      Are you sure you want to cancel this swap listing? The shift will remain yours and the listing
+      will be removed.
+    </p>
+  </app-confirmation-modal>
+
+  <!-- ══════════════════ POST A SHIFT MODAL ═════════════════════════════ -->
+  @if (postModalOpen()) {
+    <div class="fixed inset-0 z-40 bg-black/50" aria-hidden="true"></div>
+    <div
+      class="fixed inset-0 z-50 flex items-end pt-safe-top pb-safe-bottom justify-center sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="post-modal-title"
+      data-testid="post-shift-modal"
+    >
+      <div
+        class="w-full bg-white shadow-xl sm:max-w-lg sm:rounded-xl max-h-safe-dvh sm:max-h-[90vh] overflow-y-auto"
+      >
+        <!-- Modal header -->
+        <div class="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
+          <h3 id="post-modal-title" class="text-lg font-semibold text-neutral-900">
+            Post a Shift for Swap
+          </h3>
+          <button
+            type="button"
+            class="text-neutral-400 hover:text-neutral-600 text-2xl leading-none -m-2.5 min-w-11 p-2.5 transition-colors"
+            aria-label="Close post shift modal"
+            data-testid="post-modal-close"
+            (click)="closePostModal()"
+          >
+            &times;
+          </button>
+        </div>
+
+        <!-- Modal body -->
+        <div class="px-6 py-4">
+          <p class="mb-4 text-sm text-neutral-600">
+            Select one of your upcoming published shifts to make available for a coworker to take.
+          </p>
+
+          @if (shiftsLoading()) {
+            <app-loading-spinner />
+          } @else if (shiftsError()) {
+            <app-error-alert [message]="shiftsError()!" />
+          } @else if (eligibleShifts().length === 0) {
+            <app-empty-state
+              title="No eligible shifts"
+              description="You have no upcoming published shifts this month that can be posted for swap."
+            />
+          } @else {
+            <!-- Shift picker list -->
+            <ul
+              role="listbox"
+              aria-label="Select a shift to post for swap"
+              class="flex flex-col gap-2"
+              data-testid="shift-picker-list"
+            >
+              @for (shift of eligibleShifts(); track trackByShiftId($index, shift)) {
+                <li
+                  role="option"
+                  [attr.aria-selected]="selectedShiftId() === shift.shift_id"
+                  tabindex="0"
+                  [class]="
+                    'flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors ' +
+                    (selectedShiftId() === shift.shift_id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-neutral-200 hover:border-secondary hover:bg-neutral-50')
+                  "
+                  [attr.data-testid]="'shift-option-' + shift.shift_id"
+                  (click)="selectShift(shift.shift_id)"
+                  (keydown.enter)="selectShift(shift.shift_id)"
+                  (keydown.space)="selectShift(shift.shift_id)"
+                >
+                  <!-- Selection indicator -->
+                  <span
+                    [class]="
+                      'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ' +
+                      (selectedShiftId() === shift.shift_id
+                        ? 'border-primary bg-primary'
+                        : 'border-neutral-300')
+                    "
+                    aria-hidden="true"
+                  >
+                    @if (selectedShiftId() === shift.shift_id) {
+                      <span class="h-1.5 w-1.5 rounded-full bg-white"></span>
+                    }
+                  </span>
+
+                  <div class="min-w-0 flex-1">
+                    <p class="font-medium text-neutral-900">
+                      {{ shift.location_name || 'Location TBD' }}
+                    </p>
+                    <p class="text-sm text-neutral-500 capitalize">
+                      {{ formatDate(shift.date) }} · {{ formatTime(shift.start_time) }} –
+                      {{ formatTime(shift.end_time) }} · {{ shift.type }}
+                    </p>
+                  </div>
+                </li>
+              }
+            </ul>
+
+            @if (postError()) {
+              <div
+                role="alert"
+                class="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700"
+                data-testid="post-modal-error"
+              >
+                {{ postError() }}
+              </div>
+            }
+          }
+        </div>
+
+        <!-- Modal footer -->
+        <div class="flex flex-col gap-3 border-t border-neutral-200 px-6 py-4 sm:flex-row">
+          <app-button
+            variant="secondary"
+            [fullWidth]="true"
+            testId="post-modal-cancel"
+            (clicked)="closePostModal()"
+          >
+            Cancel
+          </app-button>
+          <app-button
+            variant="primary"
+            [fullWidth]="true"
+            testId="post-modal-confirm"
+            [loading]="posting()"
+            [disabled]="selectedShiftId() === null || shiftsLoading()"
+            (clicked)="submitPost()"
+          >
+            Post Shift
+          </app-button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

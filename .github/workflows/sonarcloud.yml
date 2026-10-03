@@ -1,0 +1,67 @@
+# Runs after every merge to main and submits a full analysis to SonarCloud.
+# SonarCloud free tier only analyzes the main branch, so this workflow is
+# intentionally separate from CI (which runs on dev).
+# Covers: reliability, security, maintainability, hotspots, duplication, and coverage.
+name: SonarCloud
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sonarcloud:
+    name: SonarCloud scan
+    runs-on: ubuntu-latest
+
+    steps:
+      # Full clone required — SonarCloud uses git blame for new-code detection
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      # @daltime/contracts is a file:vendor/contracts dependency; the vendored copy
+      # must exist before `npm ci` in backend/ (see backend/scripts/sync-contracts.mjs).
+      - name: Install contract dependencies
+        run: npm ci
+        working-directory: contracts
+
+      - name: Build and vendor contracts into the backend
+        run: node scripts/sync-contracts.mjs
+        working-directory: backend
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      # Run tests with lcov coverage so SonarCloud can display coverage metrics
+      - name: Run frontend tests with coverage
+        run: npm test -- --configuration=ci
+        working-directory: frontend
+
+      - name: Run backend tests with coverage
+        run: npm run test:ci
+        working-directory: backend
+
+      - name: SonarCloud scan
+        uses: sonarsource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

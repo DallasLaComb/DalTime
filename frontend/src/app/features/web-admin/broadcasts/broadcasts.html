@@ -1,0 +1,220 @@
+<div class="w-full px-4 py-4 md:py-6">
+  <h2 class="mb-1 text-2xl font-bold text-gray-900">Broadcasts</h2>
+  <p class="mb-6 text-sm text-gray-500">
+    Show a banner across the app — e.g. a maintenance window or an update on a known issue.
+  </p>
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <!-- Composer -->
+    <section class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900">New broadcast</h3>
+
+      @if (sentMessage()) {
+        <div
+          role="status"
+          class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+          data-testid="broadcast-sent"
+        >
+          {{ sentMessage() }}
+        </div>
+      }
+      @if (sendError(); as error) {
+        <app-error-alert [message]="error" data-testid="broadcast-send-error" />
+      }
+
+      <div class="flex flex-col gap-1">
+        <label for="broadcastMessage" class="text-sm font-medium text-gray-700">Message</label>
+        <textarea
+          id="broadcastMessage"
+          rows="4"
+          [maxLength]="messageMax"
+          class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+          placeholder="There is expected maintenance on Oct 5 between 9pm–10pm ET. The site may be unavailable during this time."
+          [value]="message()"
+          (input)="onMessageInput($event)"
+          data-testid="broadcast-message"
+        ></textarea>
+        <span class="self-end text-xs text-gray-500" data-testid="broadcast-message-count">
+          {{ messageLength() }} / {{ messageMax }}
+        </span>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label for="broadcastSeverity" class="text-sm font-medium text-gray-700">Severity</label>
+        <select
+          id="broadcastSeverity"
+          class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+          (change)="onSeverityChange($event)"
+          data-testid="broadcast-severity"
+        >
+          @for (opt of severityOptions; track opt.value) {
+            <option [value]="opt.value" [selected]="opt.value === severity()">
+              {{ opt.label }}
+            </option>
+          }
+        </select>
+      </div>
+
+      <fieldset class="flex flex-col gap-2">
+        <legend class="mb-1 text-sm font-medium text-gray-700">Send to</legend>
+        @for (opt of targetOptions; track opt.value) {
+          <div class="flex items-center gap-2">
+            <input
+              type="radio"
+              name="broadcastTarget"
+              [id]="'broadcastTarget-' + opt.value"
+              [value]="opt.value"
+              [checked]="target() === opt.value"
+              (change)="onTargetChange(opt.value)"
+              class="h-4 w-4 accent-dt-primary"
+              [attr.data-testid]="'broadcast-target-' + opt.value"
+            />
+            <label [for]="'broadcastTarget-' + opt.value" class="text-sm text-gray-800">{{
+              opt.label
+            }}</label>
+          </div>
+        }
+      </fieldset>
+
+      @if (needsOrg()) {
+        <div class="flex flex-col gap-1">
+          <label for="broadcastOrg" class="text-sm font-medium text-gray-700">Organization</label>
+          <select
+            id="broadcastOrg"
+            class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+            (change)="onOrgChange($event)"
+            data-testid="broadcast-org"
+          >
+            <option value="" [selected]="orgId() === ''" disabled>Select an organization</option>
+            @for (org of organizations(); track org.org_id) {
+              <option [value]="org.org_id" [selected]="org.org_id === orgId()">
+                {{ org.name }}
+              </option>
+            }
+          </select>
+        </div>
+      }
+
+      @if (needsRole()) {
+        <div class="flex flex-col gap-1">
+          <label for="broadcastRole" class="text-sm font-medium text-gray-700">Role</label>
+          <select
+            id="broadcastRole"
+            class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+            (change)="onRoleChange($event)"
+            data-testid="broadcast-role"
+          >
+            @for (opt of roleOptions; track opt.value) {
+              <option [value]="opt.value" [selected]="opt.value === role()">{{ opt.label }}</option>
+            }
+          </select>
+        </div>
+      }
+
+      <div class="flex flex-col gap-1">
+        <label for="broadcastExpiry" class="text-sm font-medium text-gray-700">
+          Stop showing at <span class="font-normal text-gray-500">(optional, your local time)</span>
+        </label>
+        <div class="flex items-center gap-2">
+          <input
+            id="broadcastExpiry"
+            type="datetime-local"
+            class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+            [value]="expiresAtLocal()"
+            (input)="onExpiryInput($event)"
+            data-testid="broadcast-expiry"
+          />
+          @if (expiresAtLocal()) {
+            <app-button
+              variant="ghost"
+              size="sm"
+              testId="broadcast-expiry-clear"
+              (clicked)="clearExpiry()"
+            >
+              Clear
+            </app-button>
+          }
+        </div>
+        @if (expiryError(); as error) {
+          <span class="text-xs text-red-600" data-testid="broadcast-expiry-error">{{ error }}</span>
+        } @else if (!expiresAtLocal()) {
+          <span class="text-xs text-gray-500">No expiry — it stays up until you take it down.</span>
+        }
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <span class="text-sm font-medium text-gray-700">Preview</span>
+        <app-broadcast-banner [broadcast]="preview()" [canDismiss]="false" />
+      </div>
+
+      <app-button
+        [disabled]="!isValid()"
+        [loading]="sending()"
+        testId="broadcast-send"
+        (clicked)="send()"
+      >
+        Send broadcast
+      </app-button>
+    </section>
+
+    <!-- Active broadcasts -->
+    <section class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h3 class="text-lg font-semibold text-gray-900">Active broadcasts</h3>
+
+      @if (listError(); as error) {
+        <app-error-alert [message]="error" [retryable]="true" (retry)="loadActive()" />
+      }
+
+      @if (loadingActive()) {
+        <app-loading-spinner label="Loading broadcasts..." />
+      } @else if (active().length === 0) {
+        <app-empty-state
+          title="No active broadcasts"
+          description="Nothing is showing to users right now."
+        />
+      } @else {
+        <ul class="flex flex-col gap-3" data-testid="broadcast-active-list">
+          @for (b of active(); track b.broadcast_id) {
+            <li
+              class="flex flex-col gap-2 rounded-lg border border-gray-200 p-3"
+              [attr.data-testid]="'broadcast-active-' + b.broadcast_id"
+            >
+              <app-broadcast-banner [broadcast]="b" [canDismiss]="false" />
+              <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                <span>
+                  To <strong class="text-gray-700">{{ audience(b) }}</strong> ·
+                  @if (b.expires_at) {
+                    until {{ b.expires_at | date: 'medium' }}
+                  } @else {
+                    no expiry
+                  }
+                </span>
+                <app-button
+                  variant="danger-outline"
+                  size="sm"
+                  [testId]="'broadcast-remove-' + b.broadcast_id"
+                  (clicked)="askRemove(b)"
+                >
+                  Take down
+                </app-button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+</div>
+
+<app-confirmation-modal
+  [open]="pendingRemoval() !== null"
+  title="Take down broadcast?"
+  confirmLabel="Take down"
+  [saving]="removing()"
+  (confirmed)="confirmRemove()"
+  (cancelled)="cancelRemove()"
+>
+  <p class="text-sm text-gray-600" data-testid="broadcast-remove-modal">
+    The banner will stop showing to everyone it was sent to.
+  </p>
+</app-confirmation-modal>

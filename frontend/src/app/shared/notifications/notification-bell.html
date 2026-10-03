@@ -1,0 +1,36 @@
+<div class="dt-debug relative" data-testid="notification-bell-wrapper">
+  <!-- Bell button — navigates to the /notifications page; no inline panel.
+       Uses variant="ghost" (the standard DalTime icon-nav button in the navbar context).
+       ariaLabel is forwarded to the inner <button> element so screen readers and
+       test queries against [data-testid="notification-bell"] see it on the same node. -->
+  <app-button
+    variant="ghost"
+    [ariaLabel]="hasUnread() ? unreadCount() + ' unread notifications — view all' : 'Notifications'"
+    testId="notification-bell"
+    (clicked)="navigateToNotifications()"
+  >
+    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+      />
+    </svg>
+
+    @if (hasUnread()) {
+      <span
+        class="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-none text-white"
+        data-testid="notification-unread-badge"
+        aria-hidden="true"
+      >
+        {{ unreadCount() > 9 ? '9+' : unreadCount() }}
+      </span>
+    }
+
+    <!-- Accessible live region for unread count — never color-only; screen readers announce changes without focus. -->
+    <span class="sr-only" aria-live="polite" data-testid="notification-unread-live-region">
+      {{ hasUnread() ? unreadCount() + ' unread notifications' : 'No unread notifications' }}
+    </span>
+  </app-button>
+</div>

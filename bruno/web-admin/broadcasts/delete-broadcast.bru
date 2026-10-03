@@ -1,0 +1,11 @@
+meta {
+  name: Delete Broadcast
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{base_url}}/web-admin/broadcasts/{{broadcast_id}}
+  body: none
+  auth: none
+}

@@ -1,0 +1,475 @@
+{
+  "employees": [
+    { "id": "e1", "name": "Alice Johnson" },
+    { "id": "e2", "name": "Bob Martinez" },
+    { "id": "e3", "name": "Carol Chen" },
+    { "id": "e4", "name": "David Kim" },
+    { "id": "e5", "name": "Emma Wilson" }
+  ],
+  "locations": [
+    { "id": "l1", "name": "Main Office" },
+    { "id": "l2", "name": "Downtown Site" },
+    { "id": "l3", "name": "Warehouse" }
+  ],
+  "shifts": [
+    {
+      "id": "s1",
+      "date": "2026-05-01",
+      "employeeId": "e1",
+      "locationId": "l1",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s2",
+      "date": "2026-05-01",
+      "employeeId": "e2",
+      "locationId": "l2",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s3",
+      "date": "2026-05-02",
+      "employeeId": "e3",
+      "locationId": "l3",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s4",
+      "date": "2026-05-04",
+      "employeeId": "e4",
+      "locationId": "l1",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s5",
+      "date": "2026-05-04",
+      "employeeId": "e5",
+      "locationId": "l2",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s6",
+      "date": "2026-05-05",
+      "employeeId": "e1",
+      "locationId": "l3",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s7",
+      "date": "2026-05-05",
+      "employeeId": "e2",
+      "locationId": "l1",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s8",
+      "date": "2026-05-06",
+      "employeeId": "e3",
+      "locationId": "l2",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s9",
+      "date": "2026-05-06",
+      "employeeId": "e4",
+      "locationId": "l3",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s10",
+      "date": "2026-05-07",
+      "employeeId": "e5",
+      "locationId": "l1",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s11",
+      "date": "2026-05-07",
+      "employeeId": "e1",
+      "locationId": "l2",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s12",
+      "date": "2026-05-08",
+      "employeeId": "e2",
+      "locationId": "l3",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s13",
+      "date": "2026-05-08",
+      "employeeId": "e3",
+      "locationId": "l1",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s14",
+      "date": "2026-05-09",
+      "employeeId": "e4",
+      "locationId": "l2",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s15",
+      "date": "2026-05-09",
+      "employeeId": "e5",
+      "locationId": "l3",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s16",
+      "date": "2026-05-11",
+      "employeeId": "e2",
+      "locationId": "l1",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s17",
+      "date": "2026-05-11",
+      "employeeId": "e3",
+      "locationId": "l2",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s18",
+      "date": "2026-05-12",
+      "employeeId": "e4",
+      "locationId": "l3",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s19",
+      "date": "2026-05-12",
+      "employeeId": "e1",
+      "locationId": "l1",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s20",
+      "date": "2026-05-13",
+      "employeeId": "e5",
+      "locationId": "l2",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s21",
+      "date": "2026-05-13",
+      "employeeId": "e2",
+      "locationId": "l3",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s22",
+      "date": "2026-05-14",
+      "employeeId": "e3",
+      "locationId": "l1",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s23",
+      "date": "2026-05-14",
+      "employeeId": "e4",
+      "locationId": "l2",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s24",
+      "date": "2026-05-15",
+      "employeeId": "e5",
+      "locationId": "l3",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s25",
+      "date": "2026-05-15",
+      "employeeId": "e1",
+      "locationId": "l1",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s26",
+      "date": "2026-05-16",
+      "employeeId": "e2",
+      "locationId": "l2",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s27",
+      "date": "2026-05-16",
+      "employeeId": "e3",
+      "locationId": "l3",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s28",
+      "date": "2026-05-18",
+      "employeeId": "e4",
+      "locationId": "l1",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s29",
+      "date": "2026-05-18",
+      "employeeId": "e5",
+      "locationId": "l2",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s30",
+      "date": "2026-05-19",
+      "employeeId": "e1",
+      "locationId": "l3",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s31",
+      "date": "2026-05-19",
+      "employeeId": "e2",
+      "locationId": "l1",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s32",
+      "date": "2026-05-20",
+      "employeeId": "e3",
+      "locationId": "l2",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s33",
+      "date": "2026-05-20",
+      "employeeId": "e4",
+      "locationId": "l3",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s34",
+      "date": "2026-05-21",
+      "employeeId": "e5",
+      "locationId": "l1",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s35",
+      "date": "2026-05-21",
+      "employeeId": "e1",
+      "locationId": "l2",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s36",
+      "date": "2026-05-22",
+      "employeeId": "e2",
+      "locationId": "l3",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s37",
+      "date": "2026-05-22",
+      "employeeId": "e3",
+      "locationId": "l1",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s38",
+      "date": "2026-05-23",
+      "employeeId": "e4",
+      "locationId": "l2",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s39",
+      "date": "2026-05-23",
+      "employeeId": "e5",
+      "locationId": "l3",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s40",
+      "date": "2026-05-25",
+      "employeeId": "e1",
+      "locationId": "l1",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s41",
+      "date": "2026-05-26",
+      "employeeId": "e2",
+      "locationId": "l2",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s42",
+      "date": "2026-05-26",
+      "employeeId": "e3",
+      "locationId": "l3",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s43",
+      "date": "2026-05-27",
+      "employeeId": "e4",
+      "locationId": "l1",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s44",
+      "date": "2026-05-27",
+      "employeeId": "e5",
+      "locationId": "l2",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s45",
+      "date": "2026-05-28",
+      "employeeId": "e1",
+      "locationId": "l3",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s46",
+      "date": "2026-05-28",
+      "employeeId": "e2",
+      "locationId": "l1",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s47",
+      "date": "2026-05-29",
+      "employeeId": "e3",
+      "locationId": "l2",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    },
+    {
+      "id": "s48",
+      "date": "2026-05-29",
+      "employeeId": "e4",
+      "locationId": "l3",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s49",
+      "date": "2026-05-30",
+      "employeeId": "e5",
+      "locationId": "l1",
+      "type": "afternoon",
+      "startTime": "2:00 PM",
+      "endTime": "10:00 PM"
+    },
+    {
+      "id": "s50",
+      "date": "2026-05-30",
+      "employeeId": "e1",
+      "locationId": "l2",
+      "type": "morning",
+      "startTime": "6:00 AM",
+      "endTime": "2:00 PM"
+    },
+    {
+      "id": "s51",
+      "date": "2026-05-31",
+      "employeeId": "e2",
+      "locationId": "l3",
+      "type": "night",
+      "startTime": "10:00 PM",
+      "endTime": "6:00 AM"
+    }
+  ]
+}

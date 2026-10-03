@@ -1,0 +1,18 @@
+meta {
+  name: Update Profile
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{base_url}}/web-admin/profile
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "first_name": "Alice",
+    "last_name": "Smith"
+  }
+}

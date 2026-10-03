@@ -1,0 +1,200 @@
+<div class="max-w-2xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">My Organization</h1>
+
+  @if (loading()) {
+    <div class="flex justify-center py-16">
+      <output class="dt-spinner text-dt-primary"></output>
+    </div>
+  } @else if (error()) {
+    <div
+      class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4"
+      data-testid="org-error"
+    >
+      {{ error() }}
+    </div>
+    <app-button variant="secondary" (clicked)="load()">Retry</app-button>
+  } @else if (org()) {
+    @if (saveSuccess()) {
+      <div
+        class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 mb-4"
+        data-testid="save-success"
+      >
+        Organization updated successfully.
+      </div>
+    }
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+      @if (editing()) {
+        <div class="px-6 py-5">
+          <h2 class="text-sm font-semibold text-gray-700 mb-4">Edit Organization</h2>
+
+          @if (saveError()) {
+            <div
+              class="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800 mb-4"
+              data-testid="save-error"
+            >
+              {{ saveError() }}
+            </div>
+          }
+
+          <div class="mb-4">
+            <label
+              for="edit-org-name"
+              class="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1"
+              >Name</label
+            >
+            <input
+              id="edit-org-name"
+              type="text"
+              class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary mb-1"
+              [class.input-error]="editSubmitted() && !editName().trim()"
+              data-testid="edit-name-input"
+              [value]="editName()"
+              (input)="editName.set($any($event.target).value)"
+              autocomplete="organization"
+            />
+            @if (editSubmitted() && !editName().trim()) {
+              <p class="input-feedback" data-testid="name-error">Name is required</p>
+            }
+          </div>
+
+          <div class="mb-4">
+            <label
+              for="edit-org-street"
+              class="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1"
+              >Street <span class="font-normal normal-case text-gray-400">(optional)</span></label
+            >
+            <input
+              id="edit-org-street"
+              type="text"
+              class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary mb-1"
+              [class.input-error]="editSubmitted() && addressErrors().street"
+              data-testid="edit-street-input"
+              [value]="editStreet()"
+              (input)="editStreet.set($any($event.target).value)"
+              autocomplete="address-line1"
+            />
+            @if (editSubmitted() && addressErrors().street; as msg) {
+              <p class="input-feedback" data-testid="street-error">{{ msg }}</p>
+            }
+          </div>
+          <div class="grid grid-cols-6 gap-3">
+            <div class="col-span-6 sm:col-span-3">
+              <label
+                for="edit-org-city"
+                class="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1"
+                >City</label
+              >
+              <input
+                id="edit-org-city"
+                type="text"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary mb-1"
+                [class.input-error]="editSubmitted() && addressErrors().city"
+                data-testid="edit-city-input"
+                [value]="editCity()"
+                (input)="editCity.set($any($event.target).value)"
+                autocomplete="address-level2"
+              />
+              @if (editSubmitted() && addressErrors().city; as msg) {
+                <p class="input-feedback" data-testid="city-error">{{ msg }}</p>
+              }
+            </div>
+            <div class="col-span-2 sm:col-span-1">
+              <label
+                for="edit-org-state"
+                class="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1"
+                >State</label
+              >
+              <input
+                id="edit-org-state"
+                type="text"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary mb-1"
+                [class.input-error]="editSubmitted() && addressErrors().state"
+                data-testid="edit-state-input"
+                [value]="editState()"
+                (input)="editState.set($any($event.target).value)"
+                autocomplete="address-level1"
+                maxlength="2"
+              />
+              @if (editSubmitted() && addressErrors().state; as msg) {
+                <p class="input-feedback" data-testid="state-error">{{ msg }}</p>
+              }
+            </div>
+            <div class="col-span-4 sm:col-span-2">
+              <label
+                for="edit-org-zip"
+                class="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1"
+                >ZIP</label
+              >
+              <input
+                id="edit-org-zip"
+                type="text"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary mb-1"
+                [class.input-error]="editSubmitted() && addressErrors().zip"
+                data-testid="edit-zip-input"
+                [value]="editZip()"
+                (input)="editZip.set($any($event.target).value)"
+                autocomplete="postal-code"
+                inputmode="numeric"
+              />
+              @if (editSubmitted() && addressErrors().zip; as msg) {
+                <p class="input-feedback" data-testid="zip-error">{{ msg }}</p>
+              }
+            </div>
+          </div>
+
+          <div class="flex gap-2">
+            <app-button
+              variant="secondary"
+              size="sm"
+              testId="cancel-edit-btn"
+              (clicked)="cancelEdit()"
+              >Cancel</app-button
+            >
+            <app-button
+              variant="primary"
+              size="sm"
+              [loading]="saving()"
+              testId="save-btn"
+              (clicked)="save()"
+              >Save</app-button
+            >
+          </div>
+        </div>
+      } @else {
+        <!-- Name -->
+        <div class="px-6 py-4 flex justify-between items-center">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Name</p>
+            <p class="text-sm text-gray-900 mb-0" data-testid="org-name">{{ org()!.name }}</p>
+          </div>
+        </div>
+
+        <!-- Address -->
+        <div class="px-6 py-4 flex justify-between items-center">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+              Address
+            </p>
+            <p class="text-sm text-gray-900 mb-0" data-testid="org-address">{{ orgAddress() }}</p>
+          </div>
+          <app-button variant="primary-outline" size="sm" testId="edit-btn" (clicked)="startEdit()"
+            >Edit</app-button
+          >
+        </div>
+
+        <!-- Org ID (read-only) -->
+        <div class="px-6 py-4 flex justify-between items-center">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+              Organization ID
+            </p>
+            <p class="text-sm text-gray-500 font-mono mb-0" data-testid="org-id">
+              {{ org()!.org_id }}
+            </p>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

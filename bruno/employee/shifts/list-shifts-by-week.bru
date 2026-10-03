@@ -1,0 +1,45 @@
+meta {
+  name: List Employee Shifts (Week)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/employee/shifts?week=2025-06-09
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{employee_token}}
+}
+
+docs {
+  Returns all published shifts assigned to the calling employee for a 7-day window.
+  The "week" value is the week-start date (typically Monday). The endpoint returns
+  shifts from week-start through week-start+6 days inclusive.
+
+  Query param: week=YYYY-MM-DD (the Monday of the desired week; exactly one of month/date/week must be supplied)
+
+  Example: week=2025-06-09 → returns shifts from 2025-06-09 to 2025-06-15 inclusive.
+
+  Response 200:
+  [
+    {
+      "shift_id": "abc-123",
+      "org_id": "org-sunset",
+      "employee_id": "emp-001",
+      "date": "2025-06-09",
+      "start_time": "09:00",
+      "end_time": "17:00",
+      "type": "morning",
+      "status": "published",
+      "available_for_pickup": false,
+      "created_at": "2025-06-01T00:00:00.000Z",
+      "updated_at": "2025-06-01T00:00:00.000Z"
+    }
+  ]
+
+  Response 400 (bad format):
+  { "error": "week must be in YYYY-MM-DD format (the Monday of the desired week)" }
+}

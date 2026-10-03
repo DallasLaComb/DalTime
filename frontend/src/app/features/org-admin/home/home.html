@@ -1,0 +1,208 @@
+<div class="w-full px-4 py-6 md:px-6">
+  @if (loading()) {
+    <app-loading-spinner />
+  } @else if (error()) {
+    <app-error-alert [message]="error()!" />
+  } @else if (overview(); as o) {
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Overview</h2>
+      <p class="text-sm text-gray-500" data-testid="home-week">Week of {{ weekLabel() }}</p>
+    </div>
+
+    <!-- ── Headline numbers ─────────────────────────────────────────────────── -->
+    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="home-tiles">
+      <a
+        routerLink="/org-admin/schedule"
+        class="block rounded-xl border bg-white p-5 shadow-sm no-underline transition-shadow hover:shadow-md"
+        [class]="o.unfilled_slots > 0 ? 'border-amber-300' : 'border-gray-200'"
+        data-testid="tile-unfilled"
+      >
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Unfilled shifts this week
+        </p>
+        <p
+          class="mt-2 text-4xl font-bold"
+          [class]="o.unfilled_slots > 0 ? 'text-amber-600' : 'text-gray-900'"
+          data-testid="tile-unfilled-value"
+        >
+          {{ o.unfilled_slots }}
+        </p>
+        <p class="mt-1 text-sm text-gray-500">
+          open {{ o.unfilled_slots === 1 ? 'slot' : 'slots' }} across {{ o.unfilled_shifts }}
+          {{ o.unfilled_shifts === 1 ? 'shift' : 'shifts' }}
+        </p>
+      </a>
+
+      <a
+        routerLink="/org-admin/schedule"
+        class="block rounded-xl border bg-white p-5 shadow-sm no-underline transition-shadow hover:shadow-md"
+        [class]="o.drafts_to_publish > 0 ? 'border-blue-300' : 'border-gray-200'"
+        data-testid="tile-drafts"
+      >
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Drafts to publish</p>
+        <p
+          class="mt-2 text-4xl font-bold"
+          [class]="o.drafts_to_publish > 0 ? 'text-blue-600' : 'text-gray-900'"
+          data-testid="tile-drafts-value"
+        >
+          {{ o.drafts_to_publish }}
+        </p>
+        <p class="mt-1 text-sm text-gray-500">
+          draft {{ o.drafts_to_publish === 1 ? 'shift' : 'shifts' }} in the next
+          {{ o.drafts_window_days }} days
+        </p>
+      </a>
+
+      <div
+        class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+        data-testid="tile-requests"
+      >
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Pending requests</p>
+        <p class="mt-2 text-4xl font-bold text-gray-900" data-testid="tile-requests-value">
+          {{ o.open_swap_requests }}
+        </p>
+        <p class="mt-1 text-sm text-gray-500">
+          open shift-swap {{ o.open_swap_requests === 1 ? 'listing' : 'listings' }}
+        </p>
+      </div>
+
+      <a
+        routerLink="/org-admin/employees"
+        class="block rounded-xl border border-gray-200 bg-white p-5 shadow-sm no-underline transition-shadow hover:shadow-md"
+        data-testid="tile-headcount"
+      >
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Headcount</p>
+        <p class="mt-2 text-4xl font-bold text-gray-900" data-testid="tile-headcount-value">
+          {{ o.headcount.employees }}
+        </p>
+        <p class="mt-1 text-sm text-gray-500" data-testid="tile-headcount-detail">
+          {{ o.headcount.employees | plural: 'employee' }} ·
+          {{ o.headcount.managers | plural: 'manager' }} ·
+          {{ o.headcount.locations | plural: 'location' }}
+        </p>
+        @if (o.headcount.disabled_employees + o.headcount.disabled_managers > 0) {
+          <p class="mt-1 text-xs text-gray-400" data-testid="tile-headcount-disabled">
+            Active only · {{ o.headcount.disabled_employees | plural: 'disabled employee' }} and
+            {{ o.headcount.disabled_managers | plural: 'disabled manager' }} not counted
+          </p>
+        }
+      </a>
+    </div>
+
+    <!-- ── Things that need attention ───────────────────────────────────────── -->
+    @if (o.headcount.pending_invites > 0 || o.headcount.unassigned_employees > 0) {
+      <ul
+        class="mb-6 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700 shadow-sm"
+        data-testid="home-attention"
+      >
+        @if (o.headcount.pending_invites > 0) {
+          <li data-testid="attention-invites">
+            {{ o.headcount.pending_invites }}
+            {{ o.headcount.pending_invites === 1 ? 'person has' : 'people have' }} not set a
+            password yet (active people only — already counted in the headcount).
+            <a
+              routerLink="/org-admin/employees"
+              [queryParams]="{ status: 'pending' }"
+              class="font-medium text-dt-primary"
+              data-testid="pending-employees-link"
+              >Employees</a
+            >
+            ·
+            <a
+              routerLink="/org-admin/managers"
+              [queryParams]="{ status: 'pending' }"
+              class="font-medium text-dt-primary"
+              data-testid="pending-managers-link"
+              >Managers</a
+            >
+          </li>
+        }
+        @if (o.headcount.unassigned_employees > 0) {
+          <li data-testid="attention-unassigned">
+            {{ o.headcount.unassigned_employees }}
+            {{ o.headcount.unassigned_employees === 1 ? 'employee has' : 'employees have' }} no
+            manager.
+            <a routerLink="/org-admin/employees" class="font-medium text-dt-primary">Assign one</a>
+          </li>
+        }
+      </ul>
+    }
+
+    <!-- ── Per-manager breakdown ────────────────────────────────────────────── -->
+    <section
+      class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+      aria-label="By manager"
+    >
+      <h3 class="border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-semibold text-gray-800">
+        By manager
+      </h3>
+      @if (o.managers.length === 0) {
+        <p class="px-5 py-8 text-center text-sm text-gray-500" data-testid="home-no-managers">
+          No managers yet.
+          <a routerLink="/org-admin/managers" class="font-medium text-dt-primary">Add one</a>
+        </p>
+      } @else {
+        <ul class="divide-y divide-gray-100" data-testid="home-managers">
+          @for (m of o.managers; track m.manager_id) {
+            <li
+              class="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1.2fr)_1fr_1fr_auto] sm:items-center"
+              data-testid="home-manager-row"
+            >
+              <!-- Wraps on phones so a long name keeps its "(you)"; truncates (with a tooltip) from sm up. -->
+              <span
+                class="min-w-0 break-words font-medium text-gray-900 sm:truncate"
+                [attr.title]="m.name"
+                data-testid="home-manager-name"
+                >{{ m.name }}</span
+              >
+
+              <div>
+                <p class="mb-1 flex justify-between text-xs text-gray-500">
+                  <span>Unfilled</span>
+                  <span class="font-semibold text-gray-700">{{ m.unfilled_slots }}</span>
+                </p>
+                <div class="h-2 rounded-full bg-gray-100">
+                  <div
+                    class="h-2 rounded-full bg-amber-400"
+                    [style.width]="barWidth(m.unfilled_slots, maxUnfilled())"
+                  ></div>
+                </div>
+              </div>
+
+              <div>
+                <p class="mb-1 flex justify-between text-xs text-gray-500">
+                  <span>Employees</span>
+                  <span class="font-semibold text-gray-700">{{ m.employees }}</span>
+                </p>
+                <div class="h-2 rounded-full bg-gray-100">
+                  <div
+                    class="h-2 rounded-full bg-dt-primary"
+                    [style.width]="barWidth(m.employees, maxEmployees())"
+                  ></div>
+                </div>
+              </div>
+
+              <span
+                class="text-xs font-semibold"
+                [class]="m.drafts > 0 ? 'text-blue-600' : 'text-gray-400'"
+              >
+                {{ m.drafts }} {{ m.drafts === 1 ? 'draft' : 'drafts' }}
+              </span>
+            </li>
+          }
+        </ul>
+      }
+      @if (o.own_schedule.unfilled_slots + o.own_schedule.drafts + o.own_schedule.employees > 0) {
+        <p
+          class="border-t border-gray-100 bg-gray-50 px-5 py-3 text-xs text-gray-500"
+          data-testid="home-own-schedule"
+        >
+          The totals above also include your own schedule (managed in Manager view):
+          {{ o.own_schedule.unfilled_slots | plural: 'open slot' }},
+          {{ o.own_schedule.drafts | plural: 'draft' }} and
+          {{ o.own_schedule.employees | plural: 'employee' }}.
+        </p>
+      }
+    </section>
+  }
+</div>

@@ -1,0 +1,83 @@
+<!-- Disable Confirmation Modal -->
+<app-confirmation-modal
+  [open]="showDisableModal()"
+  [title]="'Disable ' + entityLabel()"
+  [confirmLabel]="disableNeedsAcknowledgement() ? 'Disable anyway' : 'Disable'"
+  confirmVariant="danger"
+  [saving]="saving()"
+  [confirmDisabled]="!!disableBlockedReason()"
+  (confirmed)="disableConfirmed.emit()"
+  (cancelled)="disableCancelled.emit()"
+>
+  <p>
+    Are you sure you want to disable
+    <strong [attr.data-testid]="'disable-' + testIdPrefix() + '-name'"
+      >{{ disablingEmployee()?.first_name }} {{ disablingEmployee()?.last_name }}</strong
+    >
+    (<span [attr.data-testid]="'disable-' + testIdPrefix() + '-email'">{{
+      disablingEmployee()?.email
+    }}</span
+    >)?
+  </p>
+  @if (disableBlockedReason(); as reason) {
+    <p
+      class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+      role="alert"
+      data-testid="disable-blocked"
+    >
+      {{ reason }}
+      @if (disableBlockedLink(); as link) {
+        <a
+          [routerLink]="link.route"
+          class="font-medium text-dt-primary"
+          data-testid="disable-blocked-link"
+          >{{ link.label }}</a
+        >
+      }
+    </p>
+  }
+  @if (disableError(); as err) {
+    <p
+      class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+      role="alert"
+      data-testid="disable-error"
+    >
+      {{ err }}
+    </p>
+  }
+  <p class="text-gray-500 mb-0 mt-3">
+    This will prevent them from signing in. Their data is preserved.
+  </p>
+</app-confirmation-modal>
+
+<!-- Enable Confirmation Modal -->
+<app-confirmation-modal
+  [open]="showEnableModal()"
+  [title]="'Enable ' + entityLabel()"
+  confirmLabel="Enable"
+  confirmVariant="primary"
+  [saving]="saving()"
+  (confirmed)="enableConfirmed.emit()"
+  (cancelled)="enableCancelled.emit()"
+>
+  <p>
+    Are you sure you want to re-enable
+    <strong [attr.data-testid]="'enable-' + testIdPrefix() + '-name'"
+      >{{ enablingEmployee()?.first_name }} {{ enablingEmployee()?.last_name }}</strong
+    >
+    (<span [attr.data-testid]="'enable-' + testIdPrefix() + '-email'">{{
+      enablingEmployee()?.email
+    }}</span
+    >)?
+  </p>
+  @if (enableError(); as err) {
+    <p
+      class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+      role="alert"
+      data-testid="enable-error"
+    >
+      {{ err }}
+    </p>
+  }
+  <p class="text-gray-500 mb-0 mt-3">This will restore their ability to sign in.</p>
+</app-confirmation-modal>

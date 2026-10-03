@@ -1,0 +1,286 @@
+import { isValidShiftSpan } from '../../shared/shift-time.js';
+import { randomUUID } from 'node:crypto';
+import { stripKeys } from '../../shared/dynamo.js';
+import { getOrgLocation } from '../../shared/dynamo.js';
+import * as db from './db.js';
+import { ValidationError, ForbiddenError, NotFoundError } from '../../shared/errors.js';
+import { logger } from '../../shared/logger.js';
+import type {
+  ScheduleTemplateRecord,
+  TemplateShiftBlock,
+  DayKey,
+  ShiftNeededRecord,
+} from '@daltime/contracts';
+
+const DAY_KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+async function resolveCallerOrg(sub: string): Promise<{ org_id: string; manager_id: string }> {
+  const lookup = await db.getCallerLookup(sub);
+  if (!lookup) throw new ForbiddenError('Caller organization could not be resolved');
+  return lookup;
+}
+
+function validateShiftBlocks(blocks: TemplateShiftBlock[]): void {
+  if (blocks.length === 0) throw new ValidationError('shift_blocks must not be empty');
+  if (blocks.length > 20) throw new ValidationError('shift_blocks may not exceed 20 items');
+  const validDays = new Set(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
+  for (const block of blocks) {
+    if (!block.days || block.days.length === 0) {
+      throw new ValidationError('Each shift block must specify at least one day');
+    }
+    for (const d of block.days) {
+      if (!validDays.has(d)) throw new ValidationError(`Invalid day key: ${d}`);
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(block.start_time)) {
+      throw new ValidationError('start_time must be in HH:MM format');
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(block.end_time)) {
+      throw new ValidationError('end_time must be in HH:MM format');
+    }
+    if (!isValidShiftSpan(block.start_time, block.end_time)) {
+      throw new ValidationError('end_time must differ from start_time in each block');
+    }
+    const count = Number(block.employee_count);
+    if (!Number.isInteger(count) || count < 1 || count > 50) {
+      throw new ValidationError('employee_count must be an integer between 1 and 50');
+    }
+  }
+}
+
+/**
+ * Who a template operation is scoped to. A manager only touches their own templates
+ * (`manager_id` set); an org-admin passes `manager_id: null` and may touch any template
+ * in their org (the org is the DynamoDB partition, so nothing outside `org_id` is reachable).
+ */
+export interface TemplateScope {
+  org_id: string;
+  manager_id: string | null;
+}
+
+function assertOwns(scope: TemplateScope, template: ScheduleTemplateRecord): void {
+  if (scope.manager_id !== null && template.manager_id !== scope.manager_id) {
+    throw new ForbiddenError('You do not own this template');
+  }
+}
+
+export async function listTemplates(callerSub: string) {
+  const { manager_id } = await resolveCallerOrg(callerSub);
+  const templates = await db.listTemplates(manager_id);
+  return templates.map((t) => stripKeys(t));
+}
+
+type TemplateCreateBody = {
+  location_id?: string;
+  name?: string;
+  shift_blocks?: TemplateShiftBlock[];
+};
+
+export async function createTemplate(callerSub: string, body: TemplateCreateBody) {
+  validateTemplateCreateBody(body);
+  const { org_id, manager_id } = await resolveCallerOrg(callerSub);
+  return createTemplateForManager({ org_id, manager_id }, body);
+}
+
+export function validateTemplateCreateBody(
+  body: TemplateCreateBody,
+): asserts body is Required<TemplateCreateBody> {
+  if (!body.location_id) throw new ValidationError('location_id is required');
+  if (!body.name || body.name.trim().length === 0) throw new ValidationError('name is required');
+  if (body.name.trim().length > 80)
+    throw new ValidationError('name must be 80 characters or fewer');
+  if (!body.shift_blocks) throw new ValidationError('shift_blocks is required');
+  validateShiftBlocks(body.shift_blocks);
+}
+
+/** Create a template owned by `manager_id`. `body` must already be validated. */
+export async function createTemplateForManager(
+  { org_id, manager_id }: { org_id: string; manager_id: string },
+  body: Required<TemplateCreateBody>,
+) {
+  const location = await getOrgLocation(org_id, body.location_id);
+  if (!location) throw new ForbiddenError('Location not found in your organization');
+
+  const templateId = randomUUID();
+  const now = new Date().toISOString();
+
+  const item: ScheduleTemplateRecord = {
+    PK: `ORG#${org_id}`,
+    SK: `SCHEDULE_TEMPLATE#${templateId}`,
+    GSI1PK: `MANAGER#${manager_id}`,
+    GSI1SK: `TEMPLATE#${templateId}`,
+    template_id: templateId,
+    org_id,
+    manager_id,
+    location_id: body.location_id,
+    location_name: location.name,
+    name: body.name.trim(),
+    shift_blocks: body.shift_blocks,
+    created_at: now,
+    updated_at: now,
+  };
+
+  await db.createTemplate(item);
+  logger.info('template created', { org_id, template_id: templateId, manager_id });
+  return stripKeys(item);
+}
+
+type TemplateUpdateBody = { name?: string; shift_blocks?: TemplateShiftBlock[] };
+
+export async function updateTemplate(
+  callerSub: string,
+  templateId: string,
+  body: TemplateUpdateBody,
+) {
+  validateTemplateUpdateBody(body);
+  return updateTemplateInScope(await resolveCallerOrg(callerSub), templateId, body);
+}
+
+export function validateTemplateUpdateBody(body: TemplateUpdateBody): void {
+  if (Object.keys(body).length === 0) {
+    throw new ValidationError('At least one field must be provided');
+  }
+  if (body.name !== undefined) {
+    if (body.name.trim().length === 0) throw new ValidationError('name must not be empty');
+    if (body.name.trim().length > 80)
+      throw new ValidationError('name must be 80 characters or fewer');
+  }
+  if (body.shift_blocks !== undefined) {
+    validateShiftBlocks(body.shift_blocks);
+  }
+}
+
+export async function updateTemplateInScope(
+  scope: TemplateScope,
+  templateId: string,
+  body: TemplateUpdateBody,
+) {
+  const { org_id } = scope;
+  const existing = await db.getTemplate(org_id, templateId);
+  if (!existing) throw new NotFoundError('Template not found');
+  assertOwns(scope, existing);
+
+  const fields: { name?: string; shift_blocks?: TemplateShiftBlock[] } = {};
+  if (body.name !== undefined) fields.name = body.name.trim();
+  if (body.shift_blocks !== undefined) fields.shift_blocks = body.shift_blocks;
+
+  const updated = await db.updateTemplate(org_id, templateId, fields, new Date().toISOString());
+  if (!updated) throw new NotFoundError('Template not found');
+  logger.info('template updated', { org_id, template_id: templateId });
+  return stripKeys(updated);
+}
+
+export async function removeTemplate(callerSub: string, templateId: string) {
+  return removeTemplateInScope(await resolveCallerOrg(callerSub), templateId);
+}
+
+export async function removeTemplateInScope(scope: TemplateScope, templateId: string) {
+  const { org_id } = scope;
+  const existing = await db.getTemplate(org_id, templateId);
+  if (!existing) throw new NotFoundError('Template not found');
+  assertOwns(scope, existing);
+  await db.deleteTemplate(org_id, templateId);
+  logger.info('template removed', { org_id, template_id: templateId });
+}
+
+type TemplateApplyBody = { start_date?: string; end_date?: string; skip_dates?: string[] };
+
+export async function applyTemplate(
+  callerSub: string,
+  templateId: string,
+  body: TemplateApplyBody,
+) {
+  validateTemplateApplyBody(body);
+  return applyTemplateInScope(await resolveCallerOrg(callerSub), templateId, body);
+}
+
+export function validateTemplateApplyBody(
+  body: TemplateApplyBody,
+): asserts body is Required<Pick<TemplateApplyBody, 'start_date' | 'end_date'>> &
+  TemplateApplyBody {
+  if (!body.start_date) throw new ValidationError('start_date is required');
+  if (!body.end_date) throw new ValidationError('end_date is required');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(body.start_date)) {
+    throw new ValidationError('start_date must be in YYYY-MM-DD format');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(body.end_date)) {
+    throw new ValidationError('end_date must be in YYYY-MM-DD format');
+  }
+  if (body.end_date < body.start_date) {
+    throw new ValidationError('end_date must be on or after start_date');
+  }
+
+  const startMs = new Date(body.start_date).getTime();
+  const endMs = new Date(body.end_date).getTime();
+  const dayMs = 86_400_000;
+  if (endMs - startMs > 366 * dayMs) {
+    throw new ValidationError('Date range may not exceed 366 days');
+  }
+}
+
+/**
+ * Apply a template over a date range, creating ShiftNeeded records for the template's
+ * owning manager. `body` must already be validated by `validateTemplateApplyBody`.
+ */
+export async function applyTemplateInScope(
+  scope: TemplateScope,
+  templateId: string,
+  body: Required<Pick<TemplateApplyBody, 'start_date' | 'end_date'>> & TemplateApplyBody,
+) {
+  const { org_id } = scope;
+  const dayMs = 86_400_000;
+  const skipSet = new Set(body.skip_dates ?? []);
+
+  const template = await db.getTemplate(org_id, templateId);
+  if (!template) throw new NotFoundError('Template not found');
+  assertOwns(scope, template);
+  // Shifts needed belong to the template's manager, whoever applies it.
+  const manager_id = template.manager_id;
+
+  const now = new Date().toISOString();
+  const created: ReturnType<typeof stripKeys<ShiftNeededRecord>>[] = [];
+
+  let cursor = new Date(body.start_date + 'T12:00:00Z');
+  const end = new Date(body.end_date + 'T12:00:00Z');
+
+  while (cursor <= end) {
+    const dateStr = cursor.toISOString().slice(0, 10);
+
+    if (!skipSet.has(dateStr)) {
+      const dayKey = DAY_KEYS[cursor.getUTCDay()];
+      const matchingBlocks = template.shift_blocks.filter((b) => b.days.includes(dayKey));
+
+      for (const block of matchingBlocks) {
+        const shiftId = randomUUID();
+        const item: ShiftNeededRecord = {
+          PK: `ORG#${org_id}`,
+          SK: `SHIFT_NEEDED#${shiftId}`,
+          GSI1PK: `MANAGER#${manager_id}`,
+          GSI1SK: dateStr,
+          shift_id: shiftId,
+          org_id,
+          manager_id,
+          date: dateStr,
+          start_time: block.start_time,
+          end_time: block.end_time,
+          employee_count: block.employee_count,
+          location_id: template.location_id,
+          location_name: template.location_name,
+          created_at: now,
+          updated_at: now,
+        };
+        await db.createShiftNeeded(item);
+        created.push(stripKeys(item));
+      }
+    }
+
+    cursor = new Date(cursor.getTime() + dayMs);
+  }
+
+  logger.info('template applied', {
+    org_id,
+    template_id: templateId,
+    manager_id,
+    shifts_created: created.length,
+  });
+  return { created: created.length, shifts: created };
+}

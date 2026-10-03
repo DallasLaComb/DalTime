@@ -1,0 +1,132 @@
+# Belt-and-suspenders weekly sweep: catches newly-disclosed CVEs / IaC rule updates
+# against code that hasn't changed (continuous `snyk monitor` in snyk-main.yml covers
+# most of this already, but a scheduled `test` independently re-validates and produces
+# a standing report artifact on a predictable cadence).
+#
+# Weekly (not daily): this is a 3-project npm codebase with moderate dependency churn
+# (see the @aws-sdk/* version-drift noted in docs/snyk-implementation-plan.md Section
+# 2.5) — daily would generate noise nobody reads; monthly is too slow for CVE response.
+# Monday 06:00 UTC — before the work week starts, so Monday's standup has fresh data.
+name: Snyk — Scheduled Sweep
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {} # allow manual trigger for ad-hoc "did the new advisory affect us?" checks
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scheduled-scan:
+    name: Weekly Snyk sweep (report-only)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [frontend, backend]
+      fail-fast: false # one project's findings shouldn't hide the other's
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+
+      # @daltime/contracts is a file:vendor/contracts dependency; the vendored copy
+      # must exist before `npm ci` in backend/ (see backend/scripts/sync-contracts.mjs).
+      - name: Install contract dependencies
+        run: npm ci
+        working-directory: contracts
+        if: matrix.project == 'backend'
+
+      - name: Build and vendor contracts into the backend
+        run: node scripts/sync-contracts.mjs
+        working-directory: backend
+        if: matrix.project == 'backend'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ matrix.project }}
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      # Report-only — `|| true` mirrors Checkov's `soft_fail: true` convention already
+      # established in this repo (ci.yml, foundation.yml): inform, don't fail a build
+      # that didn't change. The point is the report artifact, not a red X.
+      - name: Snyk Open Source sweep
+        working-directory: ${{ matrix.project }}
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk test \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --json-file-output=snyk-${{ matrix.project }}-report.json \
+            --sarif-file-output=snyk-${{ matrix.project }}-report.sarif || true
+
+      # License-compliance summary — plan Section 3.1 recommends starting this in
+      # report-only mode and graduating to a gate once the existing tree is audited.
+      - name: License compliance report
+        working-directory: ${{ matrix.project }}
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk test --print-deps \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            > snyk-${{ matrix.project }}-licenses.txt || true
+
+      - name: Upload weekly report artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: snyk-weekly-${{ matrix.project }}-${{ github.run_id }}
+          path: |
+            ${{ matrix.project }}/snyk-${{ matrix.project }}-report.json
+            ${{ matrix.project }}/snyk-${{ matrix.project }}-report.sarif
+            ${{ matrix.project }}/snyk-${{ matrix.project }}-licenses.txt
+          retention-days: 90 # longer than the 7-day build-artifact retention — these are audit trail, not build output
+
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles(format('{0}/snyk-{0}-report.sarif', matrix.project)) != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ matrix.project }}/snyk-${{ matrix.project }}-report.sarif
+          category: snyk-scheduled-${{ matrix.project }}
+
+  iac-sweep:
+    name: Weekly IaC sweep (report-only)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Snyk IaC sweep
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk iac test infra/template.yaml infra/foundation.yaml \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-iac-report.sarif || true
+
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('snyk-iac-report.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk-iac-report.sarif
+          category: snyk-scheduled-iac

@@ -1,0 +1,10 @@
+<div
+  class="dt-debug flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"
+  role="alert"
+  data-testid="error-alert"
+>
+  <span class="flex-grow">{{ message() }}</span>
+  @if (retryable()) {
+    <app-button variant="danger-outline" size="sm" testId="error-alert-retry" (clicked)="retry.emit()">Retry</app-button>
+  }
+</div>

@@ -1,0 +1,16 @@
+<div class="dt-debug flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6">
+  <div>
+    <ng-content select="[slot=before-title]"></ng-content>
+    <h2 class="mb-0 font-semibold text-gray-900" data-testid="page-heading">{{ title() }}</h2>
+  </div>
+  @if (actionLabel()) {
+    <app-button
+      variant="primary"
+      [fullWidth]="true"
+      testId="page-header-action"
+      (clicked)="action.emit()"
+    >
+      {{ actionLabel() }}
+    </app-button>
+  }
+</div>

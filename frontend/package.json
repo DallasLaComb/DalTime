@@ -1,0 +1,89 @@
+{
+  "name": "frontend",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve --configuration=local",
+    "start:dev": "ng serve --configuration=development",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "lint": "eslint src",
+    "contracts:types": "openapi-typescript ../contracts/openapi.json --output src/app/core/generated/api.d.ts",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios",
+    "mobile:env:pull:dev": "node scripts/mobile-env-pull.mjs dev",
+    "mobile:env:pull:qa": "node scripts/mobile-env-pull.mjs qa",
+    "mobile:env:pull:main": "node scripts/mobile-env-pull.mjs main",
+    "mobile:build:dev": "node scripts/mobile-build.mjs dev all",
+    "mobile:build:qa": "node scripts/mobile-build.mjs qa all",
+    "mobile:build:main": "node scripts/mobile-build.mjs main all",
+    "mobile:ios:dev": "node scripts/mobile-build.mjs dev ios --open",
+    "mobile:ios:qa": "node scripts/mobile-build.mjs qa ios --open",
+    "mobile:ios:main": "node scripts/mobile-build.mjs main ios --open",
+    "mobile:android:dev": "node scripts/mobile-build.mjs dev android --open",
+    "mobile:android:qa": "node scripts/mobile-build.mjs qa android --open",
+    "mobile:android:main": "node scripts/mobile-build.mjs main android --open",
+    "test:scripts": "node --test scripts/mobile-env.test.mjs"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "overrides": [
+      {
+        "files": "*.html",
+        "options": {
+          "parser": "angular"
+        }
+      }
+    ]
+  },
+  "private": true,
+  "packageManager": "npm@11.3.0",
+  "dependencies": {
+    "@angular/common": "^21.2.24",
+    "@angular/compiler": "^21.2.24",
+    "@angular/core": "^21.2.24",
+    "@angular/forms": "^21.2.24",
+    "@angular/platform-browser": "^21.2.24",
+    "@angular/router": "^21.2.24",
+    "@aws-sdk/client-cognito-identity-provider": "^3.991.0",
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/ios": "8.5.2",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.3",
+    "@capgo/capacitor-native-biometric": "8.6.11",
+    "capacitor-secure-storage-plugin": "0.13.0",
+    "posthog-js": "^1.434.5",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.2.24",
+    "@angular/cli": "^21.2.24",
+    "@angular/compiler-cli": "^21.2.24",
+    "@capacitor/cli": "8.5.2",
+    "@tailwindcss/forms": "^0.5.11",
+    "@vitest/coverage-v8": "^4.1.11",
+    "angular-eslint": "^21.4.0",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^10.3.0",
+    "fast-check": "^4.7.0",
+    "jsdom": "^27.1.0",
+    "openapi-typescript": "^7.13.0",
+    "postcss": "^8.5.23",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~5.9.2",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "piscina": "5.3.2",
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
+  }
+}

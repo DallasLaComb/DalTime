@@ -1,0 +1,22 @@
+<div class="dt-debug flex" data-testid="search-bar-container">
+  <input
+    type="text"
+    class="block flex-1 rounded-l-lg border border-r-0 border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+    [placeholder]="placeholder()"
+    [attr.aria-label]="ariaLabel()"
+    data-testid="search-bar"
+    [value]="searchValue()"
+    (input)="onInput($event)"
+  />
+  @if (searchValue()) {
+    <button
+      class="btn-dt-secondary rounded-l-none rounded-r-lg border border-dt-secondary px-3 py-2 text-sm"
+      type="button"
+      (click)="clear()"
+      aria-label="Clear search"
+      data-testid="search-bar-clear"
+    >
+      &times;
+    </button>
+  }
+</div>

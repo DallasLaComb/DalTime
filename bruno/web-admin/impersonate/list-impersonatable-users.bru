@@ -1,0 +1,16 @@
+meta {
+  name: Impersonate - List Impersonatable Users
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/web-admin/impersonate/users?orgId={{org_id}}&role=Manager
+  body: none
+  auth: none
+}
+
+docs {
+  Lists users in a given org that Web-Admin can impersonate. `role` must be
+  one of OrgAdmin | Manager | Employee. `orgId` is required.
+}

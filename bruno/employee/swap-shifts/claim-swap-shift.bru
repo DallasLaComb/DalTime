@@ -1,0 +1,64 @@
+meta {
+  name: Claim Swap Shift
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/employee/swap-shifts/{{swap_id}}/claim
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{employee_token}}
+}
+
+docs {
+  Claims an open swap listing, transferring the shift to the calling employee.
+  The SWAP# record status changes to 'claimed' and the SHIFT# record's
+  employee_id and employee_name are updated to the claimer.
+
+  After claiming, a manager notification is written (non-blocking):
+  "[Claimer Name] has taken [Poster Name]'s shift on [YYYY-MM-DD] [HH:MM–HH:MM]"
+
+  Path param: swapId — the UUID of the swap listing to claim
+
+  Validation:
+  - Swap listing must exist in caller's org (404 if not found — avoids leaking cross-org existence)
+  - Caller must NOT be the original poster (403 on self-claim)
+  - Swap listing must still be 'open' (409 if already claimed or cancelled)
+
+  Response 200 (success — returns updated swap record):
+  {
+    "swap_id": "550e8400-e29b-41d4-a716-446655440000",
+    "org_id": "org-abc123",
+    "shift_id": "shift-xyz-123",
+    "posted_by_employee_id": "emp-poster",
+    "posted_by_employee_name": "Jane Doe",
+    "manager_id": "mgr-001",
+    "status": "claimed",
+    "claimed_by_employee_id": "emp-caller",
+    "claimed_by_employee_name": "John Smith",
+    "date": "2026-07-01",
+    "start_time": "09:00",
+    "end_time": "17:00",
+    "type": "morning",
+    "location_id": "loc-1",
+    "location_name": "Main Floor",
+    "created_at": "2026-06-19T14:30:00.000Z",
+    "updated_at": "2026-06-19T15:00:00.000Z"
+  }
+
+  Response 403 (self-claim attempt):
+  { "error": "You cannot claim your own swap listing" }
+
+  Response 404 (swap listing not found):
+  { "error": "Swap listing not found" }
+
+  Response 409 (listing no longer open):
+  { "error": "This swap listing is no longer available" }
+
+  Response 500 (unexpected server error):
+  { "error": "An unexpected error occurred" }
+}

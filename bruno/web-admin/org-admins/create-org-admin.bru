@@ -1,0 +1,19 @@
+meta {
+  name: Create Org Admin
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/web-admin/organizations/{{org_id}}/org-admins
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "<email>",
+    "name": "Jane Doe",
+    "temp_password": "<password>"
+  }
+}

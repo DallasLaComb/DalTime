@@ -1,0 +1,27 @@
+<div class="dt-debug flex flex-col gap-1.5" data-testid="shift-type-hint">
+  <p class="text-sm font-medium text-gray-700">
+    Type
+    @if (derived(); as type) {
+      <span
+        class="ml-1 rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize"
+        [class]="badge[type]"
+        data-testid="shift-type-derived"
+        >{{ type }}</span
+      >
+    } @else {
+      <span class="ml-1 text-xs text-gray-400" data-testid="shift-type-derived">
+        set a start time
+      </span>
+    }
+  </p>
+  <p class="text-xs text-gray-500">
+    Set automatically from the start time — it can't be chosen separately.
+  </p>
+  <ul class="flex flex-col gap-0.5 text-xs text-gray-500" data-testid="shift-type-rules">
+    @for (rule of rules; track rule.type) {
+      <li [class]="rule.type === derived() ? 'font-semibold text-gray-800' : ''">
+        {{ rule.label }}: {{ rule.range }}
+      </li>
+    }
+  </ul>
+</div>

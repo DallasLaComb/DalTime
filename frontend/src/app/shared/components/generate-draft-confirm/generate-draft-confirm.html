@@ -1,0 +1,65 @@
+<app-confirmation-modal
+  class="dt-debug"
+  [open]="open()"
+  title="Generate draft schedule?"
+  confirmLabel="Generate draft"
+  confirmVariant="primary"
+  [saving]="saving()"
+  (confirmed)="confirmed.emit()"
+  (cancelled)="cancelled.emit()"
+>
+  <div class="flex flex-col gap-3 text-sm text-gray-700" data-testid="generate-draft-explainer">
+    <p>
+      This fills the <strong>shifts needed</strong> (the slots on the Shifts needed page) for
+      @if (managerName()) {
+        <strong>{{ managerName() }}</strong
+        >'s
+      } @else {
+        your
+      }
+      schedule in <strong>{{ monthLabel() }}</strong
+      >.
+    </p>
+    <ul class="list-disc space-y-1 pl-5">
+      <li>
+        Employees are matched to unfilled slots using their weekly availability and any
+        date-specific changes, respecting each person's maximum shifts per day.
+      </li>
+      <li>
+        The matches are saved as <strong>drafts</strong> — employees can't see them until you
+        publish.
+      </li>
+      <li>Slots nobody is available for stay unfilled so you can fill them by hand.</li>
+      <li>
+        Slots that are already filled are left alone; running again only fills slots that are still
+        unfilled.
+      </li>
+    </ul>
+    @if ((openShifts() ?? 0) > 0) {
+      <p
+        class="rounded-lg bg-gray-50 px-3 py-2 text-gray-700"
+        data-testid="generate-draft-open-shifts"
+      >
+        <strong>{{ openShifts() }} open {{ openShifts() === 1 ? 'shift' : 'shifts' }}</strong>
+        (no employee assigned) already {{ openShifts() === 1 ? 'exists' : 'exist' }} this month.
+        Generate Draft doesn't fill {{ openShifts() === 1 ? 'that one' : 'those' }} — click
+        {{ openShifts() === 1 ? 'it' : 'one' }} on the schedule and use Fill Shift.
+      </p>
+    }
+    @if (nothingOpen()) {
+      <p
+        class="rounded-lg bg-amber-50 px-3 py-2 text-amber-900"
+        role="alert"
+        data-testid="generate-draft-nothing-open"
+      >
+        <strong>There are no shifts needed to fill</strong> in {{ monthLabel() }}, so nothing would
+        be generated. No run will be used — add shifts needed (or apply a template) first.
+      </p>
+    } @else {
+      <p class="rounded-lg bg-amber-50 px-3 py-2 text-amber-900" data-testid="generate-draft-runs">
+        This uses <strong>1 of {{ maxRuns() }}</strong> monthly runs — {{ runsUsed() }}
+        {{ runsUsed() === 1 ? 'is' : 'are' }} already used, {{ runsLeftAfter() }} will be left.
+      </p>
+    }
+  </div>
+</app-confirmation-modal>

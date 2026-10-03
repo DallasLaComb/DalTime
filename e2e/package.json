@@ -1,0 +1,25 @@
+{
+  "name": "daltime-e2e",
+  "version": "1.0.0",
+  "description": "DalTime post-deploy smoke and E2E tests",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:dev": "VITEST_SEED=$(date +%s) vitest run"
+  },
+  "keywords": [],
+  "author": "Dallas LaComb",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1024.0",
+    "undici": "^7.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

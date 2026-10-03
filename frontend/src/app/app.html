@@ -1,0 +1,18 @@
+<app-navbar />
+
+<!-- WebAdmin announcements (maintenance, known issues) for the signed-in user's effective role. -->
+@if (broadcasts.current(); as broadcast) {
+  <div class="mt-2 md:mt-3">
+    <app-broadcast-banner
+      [broadcast]="broadcast"
+      [canDismiss]="broadcasts.canDismiss()"
+      (dismissed)="broadcasts.dismiss(broadcast.broadcast_id)"
+    />
+  </div>
+}
+
+<main class="flex-1">
+  <router-outlet />
+</main>
+
+<app-footer />

@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* ── Buttons ── */
+  .btn-dt {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-dt-primary {
+    @apply btn-dt bg-dt-primary text-white hover:bg-dt-secondary focus:ring-dt-primary;
+  }
+  .btn-dt-secondary {
+    @apply btn-dt border border-dt-secondary text-dt-secondary hover:bg-dt-secondary hover:text-white focus:ring-dt-secondary;
+  }
+  .btn-dt-danger {
+    @apply btn-dt bg-red-600 text-white hover:bg-red-700 focus:ring-red-600;
+  }
+  .btn-dt-danger-outline {
+    @apply btn-dt border border-red-600 text-red-600 hover:bg-red-600 hover:text-white focus:ring-red-600;
+  }
+  .btn-dt-primary-outline {
+    @apply btn-dt border border-dt-primary text-dt-primary hover:bg-dt-primary hover:text-white focus:ring-dt-primary;
+  }
+  .btn-dt-ghost {
+    @apply btn-dt border border-white/40 text-white bg-transparent hover:bg-white/10 focus:ring-white;
+  }
+  .btn-dt-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  .btn-dt-lg {
+    @apply px-6 py-3 text-base;
+  }
+  /* Touch devices: keep every button at least 44px tall (Apple HIG / Material). Desktop is unchanged. */
+  @media (pointer: coarse) {
+    .btn-dt {
+      @apply min-h-11;
+    }
+  }
+
+  /* ── Form validation ── */
+  .input-error {
+    @apply border-red-500 focus:border-red-500 focus:ring-red-500;
+  }
+  .input-feedback {
+    @apply mt-1 text-sm text-red-600;
+  }
+
+  /* ── Spinners ── */
+  .dt-spinner {
+    @apply inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-middle;
+  }
+  .dt-spinner-sm {
+    @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent align-middle;
+  }
+
+  /* ── Status badges ── */
+  .dt-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-dt-primary {
+    @apply bg-dt-primary text-white;
+  }
+  .badge-dt-secondary {
+    @apply bg-gray-500 text-white;
+  }
+  .badge-dt-success {
+    @apply bg-green-600 text-white;
+  }
+  .badge-dt-warning {
+    @apply bg-yellow-400 text-gray-900;
+  }
+}
+
+/*
+ * ── Brand Color Variables ──
+ * These mirror the tokens in tailwind.config.js.
+ * Use the Tailwind utility classes (bg-dt-primary, text-dt-secondary, etc.)
+ * in templates — these variables are here for any context where a CSS
+ * custom property is required (e.g. SVG fill, third-party widget theming).
+ * Do NOT add component classes, resets, or global styles here.
+ */
+:root {
+  --dt-primary:     #0369A1;
+  --dt-secondary:   #0EA5E9;
+  --dt-tertiary:    #7DD3FC;
+
+  --dt-neutral-50:  #F8F9FA;
+  --dt-neutral-100: #F1F3F5;
+  --dt-neutral-200: #DEE2E6;
+  --dt-neutral-300: #CED4DA;
+  --dt-neutral-500: #6C757D;
+  --dt-neutral-700: #495057;
+  --dt-neutral-900: #212529;
+
+  --dt-success:     #198754;
+  --dt-warning:     #FFC107;
+  --dt-error:       #DC3545;
+  --dt-info:        #0DCAF0;
+}

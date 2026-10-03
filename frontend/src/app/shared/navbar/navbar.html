@@ -1,0 +1,330 @@
+<nav class="dt-debug sticky top-0 z-50 bg-dt-primary pt-safe-top shadow-md">
+  <!-- Impersonation banner — shown directly below the main nav bar -->
+  @if (impersonationService.viewingAs()) {
+    <app-impersonation-banner
+      data-testid="impersonation-banner-wrapper"
+      (exitClicked)="endImpersonation()"
+    />
+  }
+
+  <div class="w-full px-4 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <!-- Brand -->
+      <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+        <a
+          class="flex items-center gap-2.5 font-bold text-white no-underline text-lg tracking-tight shrink-0"
+          [routerLink]="dashboardRoute()"
+        >
+          <img src="daltime-logo.png" alt="DalTime" class="h-8 w-auto brightness-0 invert" />
+          <!-- The wordmark yields to the org name on phones (the logo still identifies the app). -->
+          <span class="hidden sm:inline">DalTime</span>
+        </a>
+        @if (orgName()) {
+          <span
+            class="min-w-0 max-w-[6.5rem] truncate border-l border-white/30 pl-2 text-sm font-medium text-white/80 sm:max-w-[14rem] sm:pl-3"
+            [title]="orgName()!"
+            data-testid="navbar-org-name"
+            >{{ orgName() }}</span
+          >
+        }
+        @if (viewMode.managerMode()) {
+          <span
+            class="hidden rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white sm:block"
+            data-testid="navbar-manager-view-badge"
+            >Manager view</span
+          >
+        }
+      </div>
+
+      <!-- Mobile: bell + hamburger (authenticated) or Sign In -->
+      @if (authService.isAuthenticatedSignal()) {
+        <!-- lg:ml-4 prevents the bell from sitting flush against the brand logo on desktop
+             where the hamburger is hidden and the mainNav is positioned via flex-1. -->
+        <div class="flex items-center gap-1 lg:ml-4">
+          <!-- Notification bell is shown at every breakpoint (outside the collapsible mainNav) so it's always reachable, including on mobile where mainNav is collapsed by default. -->
+          <!-- Org Admin ⇄ Manager view switch: always visible in the bar (not tucked into the menu). -->
+          @if (viewMode.canSwitch()) {
+            <app-button
+              variant="secondary"
+              size="sm"
+              [testId]="
+                viewMode.managerMode() ? 'navbar-back-to-org-admin' : 'navbar-view-as-manager'
+              "
+              (clicked)="switchView()"
+              >
+              <!-- Short on phones so the logo and org name keep their room. -->
+              <span class="sm:hidden">{{ viewMode.managerMode() ? '← Admin' : 'Manager' }}</span>
+              <span class="hidden sm:inline">{{
+                viewMode.managerMode() ? '← Org Admin view' : 'View as Manager'
+              }}</span>
+            </app-button>
+          }
+          @if (accountRole()) {
+            <app-notification-bell [role]="accountRole()!" data-testid="navbar-notification-bell" />
+          }
+
+          <button
+            class="lg:hidden p-2.5 rounded-md text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+            type="button"
+            [attr.aria-expanded]="menuOpen()"
+            aria-controls="mainNav"
+            aria-label="Toggle navigation"
+            data-testid="navbar-toggler"
+            (click)="toggleMenu()"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
+        </div>
+      } @else {
+        <app-button variant="ghost" testId="navbar-sign-in" (clicked)="navigateToLogin()"
+          >Sign In</app-button
+        >
+      }
+
+      <!-- Nav (authenticated) -->
+      @if (authService.isAuthenticatedSignal()) {
+        <div
+          id="mainNav"
+          [class]="
+            menuOpen()
+              ? 'flex flex-col lg:flex-row absolute lg:static top-[calc(4rem+env(safe-area-inset-top))] left-0 right-0 bg-dt-primary border-b border-white/10 shadow-lg lg:shadow-none px-4 lg:px-0 pb-4 lg:pb-0 lg:flex lg:flex-1 lg:items-center'
+              : 'hidden lg:flex lg:flex-1 lg:items-center'
+          "
+        >
+          <!-- Role nav links — driven by effectiveRole so web-admin sees impersonated role's nav -->
+          <ul class="flex flex-col lg:flex-row lg:ml-6 lg:mr-auto gap-0.5 lg:gap-1 mt-3 lg:mt-0">
+            @if (effectiveRole() === 'WebAdmin') {
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/web-admin"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  [routerLinkActiveOptions]="{ exact: true }"
+                  (click)="closeMenu()"
+                  >Dashboard</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/web-admin/organizations"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Organizations</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/web-admin/employees"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  data-testid="navbar-employees"
+                  >Employees</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/web-admin/impersonate"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  data-testid="navbar-impersonate"
+                  >Impersonate</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/web-admin/broadcasts"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  data-testid="navbar-broadcasts"
+                  >Broadcasts</a
+                >
+              </li>
+            }
+
+            @if (effectiveRole() === 'OrgAdmin') {
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/org-admin"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  [routerLinkActiveOptions]="{ exact: true }"
+                  (click)="closeMenu()"
+                  data-testid="navbar-home"
+                  >Home</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/org-admin/managers"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Managers</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/org-admin/employees"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Employees</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/org-admin/locations"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Locations</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/org-admin/organization"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Organization</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/org-admin/schedule"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  data-testid="navbar-org-admin-schedule"
+                  >Schedule</a
+                >
+              </li>
+            }
+
+            @if (effectiveRole() === 'Manager') {
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/manager"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  [routerLinkActiveOptions]="{ exact: true }"
+                  (click)="closeMenu()"
+                  >Schedule</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/manager/employees"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Employees</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/manager/shifts-needed"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Shifts Needed</a
+                >
+              </li>
+            }
+
+            @if (effectiveRole() === 'Employee') {
+              <li>
+                <!-- Points directly to /employee/schedule — the default employee landing page.
+                     routerLinkActiveOptions exact match is not needed here because the route
+                     is already a concrete leaf path, not a bare parent. -->
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/employee/schedule"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  data-testid="navbar-employee-schedule"
+                  >Schedule</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/employee/availability"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Availability</a
+                >
+              </li>
+              <li>
+                <a
+                  class="block px-3 py-2 rounded-md text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors no-underline"
+                  routerLink="/employee/swap-shifts"
+                  routerLinkActive="!text-white font-semibold bg-white/15"
+                  (click)="closeMenu()"
+                  >Swap Shifts</a
+                >
+              </li>
+            }
+          </ul>
+
+          <!-- User actions -->
+          <ul
+            class="flex flex-col lg:flex-row items-start lg:items-center gap-1 lg:gap-2 mt-3 lg:mt-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-white/10"
+          >
+            @if (displayName()) {
+              <!-- Desktop: inline quiet label sitting before Profile/Sign Out buttons -->
+              <li
+                class="hidden lg:flex lg:items-center px-3 py-2 text-sm text-white/60"
+                data-testid="navbar-display-name"
+              >
+                {{ displayName() }}
+              </li>
+              <!-- Mobile: first item in the expanded vertical menu -->
+              <li
+                class="lg:hidden px-3 py-2 text-sm text-white/60"
+                data-testid="navbar-display-name-mobile"
+              >
+                {{ displayName() }}
+              </li>
+            }
+            @if (effectiveRole()) {
+              <li>
+                <app-button variant="ghost" testId="navbar-profile" (clicked)="navigateToProfile()"
+                  >Profile</app-button
+                >
+              </li>
+            }
+            <li>
+              <app-button variant="ghost" testId="navbar-sign-out" (clicked)="openSignOutModal()"
+                >Sign Out</app-button
+              >
+            </li>
+          </ul>
+        </div>
+      }
+    </div>
+  </div>
+</nav>
+
+<app-confirmation-modal
+  [open]="showSignOutModal()"
+  title="Sign Out"
+  confirmLabel="Sign Out"
+  confirmVariant="primary"
+  [saving]="signingOut()"
+  (confirmed)="confirmSignOut()"
+  (cancelled)="closeSignOutModal()"
+>
+  <p class="mb-0 text-gray-700">Are you sure you want to sign out?</p>
+</app-confirmation-modal>

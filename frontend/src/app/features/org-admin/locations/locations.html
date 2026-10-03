@@ -1,0 +1,301 @@
+<app-crud-page
+  title="Locations"
+  actionLabel="+ Add Location"
+  [loading]="loading()"
+  [error]="error()"
+  [empty]="locations().length === 0"
+  emptyTitle="No locations added yet"
+  emptyDescription="Add a location to get started. Managers will use these when setting up shifts."
+  (action)="openCreateModal()"
+  (retry)="load()"
+>
+  <!-- ── Card list (mobile) ──────────────────────────────────────────────── -->
+  <app-card-list [data]="locations()" [trackBy]="trackById" [cardTemplate]="locationCard" />
+
+  <ng-template #locationCard let-loc>
+    <div class="mb-1 flex items-start justify-between">
+      <h6 class="mb-0 text-base font-semibold text-gray-900" data-testid="location-name">
+        {{ loc.name }}
+      </h6>
+    </div>
+    @if (loc.address) {
+      <p class="mb-1 text-sm text-gray-600" data-testid="location-address">{{ loc.address }}</p>
+    } @else {
+      <p class="mb-1 text-sm font-medium text-amber-700" data-testid="location-address-missing">
+        No address yet — edit to add one
+      </p>
+    }
+    <div class="mb-3 flex items-center justify-between">
+      <small class="text-gray-400">{{ loc.created_at | date: 'mediumDate' }}</small>
+    </div>
+    <div class="flex gap-2">
+      <app-button
+        class="flex-1"
+        variant="primary-outline"
+        size="sm"
+        testId="edit-btn"
+        (clicked)="openEditModal(loc)"
+        >Edit</app-button
+      >
+      <app-button
+        class="flex-1"
+        variant="danger-outline"
+        size="sm"
+        testId="delete-btn"
+        (clicked)="openDeleteModal(loc)"
+        >Delete</app-button
+      >
+    </div>
+  </ng-template>
+
+  <!-- ── Data table (desktop) ───────────────────────────────────────────── -->
+  <app-data-table [columns]="columns" [data]="locations()" [trackBy]="trackById">
+    @for (loc of locations(); track loc.location_id) {
+      <tr class="hover:bg-gray-50" data-testid="location-row">
+        <td class="px-4 py-3 font-semibold text-gray-900" data-testid="location-name">
+          {{ loc.name }}
+        </td>
+        <td class="px-4 py-3 text-gray-600" data-testid="location-address">
+          @if (loc.address) {
+            {{ loc.address }}
+          } @else {
+            <span class="font-medium text-amber-700" data-testid="location-address-missing"
+              >Missing — edit to add</span
+            >
+          }
+        </td>
+        <td class="px-4 py-3 text-gray-500">{{ loc.created_at | date: 'mediumDate' }}</td>
+        <td class="px-4 py-3 text-right">
+          <app-button
+            class="mr-1"
+            variant="primary-outline"
+            size="sm"
+            testId="edit-btn"
+            (clicked)="openEditModal(loc)"
+            >Edit</app-button
+          >
+          <app-button
+            variant="danger-outline"
+            size="sm"
+            testId="delete-btn"
+            (clicked)="openDeleteModal(loc)"
+            >Delete</app-button
+          >
+        </td>
+      </tr>
+    }
+  </app-data-table>
+
+  <!-- ── Modals ─────────────────────────────────────────────────────────── -->
+  <ng-container slot="modals">
+    <!-- Create Modal -->
+    @if (showCreateModal()) {
+      <div class="fixed inset-0 z-40 bg-black/50"></div>
+      <div
+        class="fixed inset-0 z-50 flex items-end pt-safe-top pb-safe-bottom justify-center sm:items-center sm:p-4"
+        tabindex="-1"
+        data-testid="create-modal"
+        (click)="closeCreateModal()"
+        (keydown.escape)="closeCreateModal()"
+      >
+        <div
+          class="w-full sm:max-w-lg"
+          tabindex="-1"
+          (click)="$event.stopPropagation()"
+          (keydown)="$event.stopPropagation()"
+        >
+          <div
+            class="max-h-safe-dvh overflow-y-auto bg-white shadow-xl sm:max-h-[90vh] sm:rounded-xl"
+          >
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h5 class="text-lg font-semibold text-gray-900">Add Location</h5>
+              <button
+                type="button"
+                class="text-2xl leading-none -m-2.5 min-w-11 p-2.5 text-gray-400 transition-colors hover:text-gray-600"
+                data-testid="close-create-modal-btn"
+                (click)="closeCreateModal()"
+              >
+                &times;
+              </button>
+            </div>
+            <div class="space-y-4 px-6 py-4">
+              @if (createError()) {
+                <div
+                  class="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800"
+                  data-testid="modal-error"
+                >
+                  {{ createError() }}
+                </div>
+              }
+              <div>
+                <label for="createName" class="mb-1 block text-sm font-medium text-gray-700"
+                  >Name</label
+                >
+                <input
+                  type="text"
+                  id="createName"
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                  [class.input-error]="createSubmitted() && !createName().trim()"
+                  data-testid="name-input"
+                  [value]="createName()"
+                  (input)="createName.set($any($event.target).value)"
+                  placeholder="e.g. Main Office"
+                  autocomplete="off"
+                />
+                @if (createSubmitted() && !createName().trim()) {
+                  <p class="input-feedback" data-testid="name-error">Name is required</p>
+                }
+              </div>
+              <div>
+                <label for="createAddress" class="mb-1 block text-sm font-medium text-gray-700"
+                  >Address</label
+                >
+                <input
+                  type="text"
+                  id="createAddress"
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                  [class.input-error]="createSubmitted() && !createAddress().trim()"
+                  data-testid="address-input"
+                  [value]="createAddress()"
+                  (input)="createAddress.set($any($event.target).value)"
+                  placeholder="e.g. 123 Main St"
+                  autocomplete="off"
+                />
+                @if (createSubmitted() && !createAddress().trim()) {
+                  <p class="input-feedback" data-testid="address-error">Address is required</p>
+                }
+              </div>
+            </div>
+            <div class="flex flex-col gap-3 border-t border-gray-200 px-6 py-4 sm:flex-row">
+              <app-button
+                variant="secondary"
+                [fullWidth]="true"
+                testId="cancel-create-btn"
+                (clicked)="closeCreateModal()"
+                >Cancel</app-button
+              >
+              <app-button
+                variant="primary"
+                [fullWidth]="true"
+                [loading]="saving()"
+                testId="save-create-btn"
+                (clicked)="create()"
+                >Add Location</app-button
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Edit Modal -->
+    @if (showEditModal()) {
+      <div class="fixed inset-0 z-40 bg-black/50"></div>
+      <div
+        class="fixed inset-0 z-50 flex items-end pt-safe-top pb-safe-bottom justify-center sm:items-center sm:p-4"
+        tabindex="-1"
+        data-testid="edit-modal"
+        (click)="closeEditModal()"
+        (keydown.escape)="closeEditModal()"
+      >
+        <div
+          class="w-full sm:max-w-lg"
+          tabindex="-1"
+          (click)="$event.stopPropagation()"
+          (keydown)="$event.stopPropagation()"
+        >
+          <div
+            class="max-h-safe-dvh overflow-y-auto bg-white shadow-xl sm:max-h-[90vh] sm:rounded-xl"
+          >
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h5 class="text-lg font-semibold text-gray-900">Edit Location</h5>
+              <button
+                type="button"
+                class="text-2xl leading-none -m-2.5 min-w-11 p-2.5 text-gray-400 transition-colors hover:text-gray-600"
+                data-testid="close-edit-modal-btn"
+                (click)="closeEditModal()"
+              >
+                &times;
+              </button>
+            </div>
+            <div class="space-y-4 px-6 py-4">
+              @if (editError()) {
+                <div
+                  class="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800"
+                  data-testid="edit-modal-error"
+                >
+                  {{ editError() }}
+                </div>
+              }
+              <div>
+                <label for="editName" class="mb-1 block text-sm font-medium text-gray-700"
+                  >Name</label
+                >
+                <input
+                  type="text"
+                  id="editName"
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                  [class.input-error]="editSubmitted() && !editName().trim()"
+                  data-testid="edit-name-input"
+                  [value]="editName()"
+                  (input)="editName.set($any($event.target).value)"
+                  autocomplete="off"
+                />
+                @if (editSubmitted() && !editName().trim()) {
+                  <p class="input-feedback" data-testid="edit-name-error">Name is required</p>
+                }
+              </div>
+              <div>
+                <label for="editAddress" class="mb-1 block text-sm font-medium text-gray-700"
+                  >Address</label
+                >
+                <input
+                  type="text"
+                  id="editAddress"
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                  [class.input-error]="editSubmitted() && !editAddress().trim()"
+                  data-testid="edit-address-input"
+                  [value]="editAddress()"
+                  (input)="editAddress.set($any($event.target).value)"
+                  autocomplete="off"
+                />
+                @if (editSubmitted() && !editAddress().trim()) {
+                  <p class="input-feedback" data-testid="edit-address-error">Address is required</p>
+                }
+              </div>
+            </div>
+            <div class="flex flex-col gap-3 border-t border-gray-200 px-6 py-4 sm:flex-row">
+              <app-button
+                variant="secondary"
+                [fullWidth]="true"
+                testId="cancel-edit-btn"
+                (clicked)="closeEditModal()"
+                >Cancel</app-button
+              >
+              <app-button
+                variant="primary"
+                [fullWidth]="true"
+                [loading]="saving()"
+                testId="save-edit-btn"
+                (clicked)="saveEdit()"
+                >Save Changes</app-button
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Delete Modal -->
+    <app-delete-modal
+      [open]="showDeleteModal()"
+      entityType="location"
+      [entityName]="deletingLocation()?.name ?? ''"
+      [saving]="saving()"
+      note="A location that still has shifts (past, draft or published) or assigned managers or employees can't be deleted. Reassign or remove them first."
+      [error]="deleteError()"
+      (confirmed)="confirmDelete()"
+      (cancelled)="closeDeleteModal()"
+    />
+  </ng-container>
+</app-crud-page>

@@ -1,0 +1,58 @@
+@if (layout() === 'card') {
+  <!-- Phone: one evenly-spaced row. Projected content (e.g. a Locations button) leads the row so
+       every action sits on the same line at the same size, like the desktop table's action column. -->
+  <div class="flex gap-2" data-testid="card-actions">
+    <ng-content />
+    @if (status() !== 'DISABLED') {
+      <app-button
+        class="flex-1"
+        variant="primary-outline"
+        size="sm"
+        testId="edit-btn"
+        (clicked)="editRequested.emit()"
+        >Edit</app-button
+      >
+      <app-button
+        class="flex-1"
+        variant="danger-outline"
+        size="sm"
+        testId="disable-btn"
+        (clicked)="disableRequested.emit()"
+        >Disable</app-button
+      >
+    } @else {
+      <app-button
+        class="flex-1"
+        variant="primary-outline"
+        size="sm"
+        testId="enable-btn"
+        (clicked)="enableRequested.emit()"
+        >Enable</app-button
+      >
+    }
+  </div>
+} @else if (status() !== 'DISABLED') {
+  <app-button
+    class="mr-1"
+    variant="primary-outline"
+    size="sm"
+    testId="edit-btn"
+    (clicked)="editRequested.emit()"
+    >Edit</app-button
+  >
+  <app-button
+    variant="danger-outline"
+    size="sm"
+    testId="disable-btn"
+    (clicked)="disableRequested.emit()"
+    >Disable</app-button
+  >
+} @else {
+  <app-button
+    variant="primary-outline"
+    size="sm"
+    testId="enable-btn"
+    (clicked)="enableRequested.emit()"
+    >Enable</app-button
+  >
+}

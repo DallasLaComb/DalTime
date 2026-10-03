@@ -1,0 +1,10 @@
+<div class="dt-debug lg:hidden">
+  @for (item of data(); track trackBy()($index, item)) {
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-4">
+      <div class="p-6">
+        <ng-container *ngTemplateOutlet="cardTemplate(); context: { $implicit: item }">
+        </ng-container>
+      </div>
+    </div>
+  }
+</div>

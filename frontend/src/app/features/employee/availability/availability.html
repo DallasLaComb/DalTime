@@ -1,0 +1,656 @@
+<div class="max-w-2xl mx-auto px-4 py-8">
+  <div
+    class="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+    data-testid="availability-deadline-banner"
+  >
+    <div class="mt-0.5 h-4 w-4 shrink-0 rounded-full bg-amber-400"></div>
+    <p class="text-sm text-amber-800">
+      <span class="font-semibold"
+        >Availability for {{ deadlineBanner().month }} is due by
+        {{ deadlineBanner().dueDate }}.</span
+      >
+      Make sure your schedule is submitted so your manager can build the schedule.
+    </p>
+  </div>
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">My Availability</h1>
+    <p class="mt-1 text-sm text-gray-500">
+      Set your recurring weekly schedule, or add date-specific changes for individual days.
+    </p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex border-b border-gray-200 mb-6">
+    <button
+      type="button"
+      class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors focus:outline-none"
+      [class]="
+        activeTab() === 'weekly'
+          ? 'border-dt-primary text-dt-primary'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+      "
+      data-testid="tab-weekly"
+      (click)="setTab('weekly')"
+      (keydown.enter)="setTab('weekly')"
+      (keydown.space)="setTab('weekly')"
+    >
+      Weekly Schedule
+    </button>
+    <button
+      type="button"
+      class="ml-4 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors focus:outline-none"
+      [class]="
+        activeTab() === 'specific'
+          ? 'border-dt-primary text-dt-primary'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+      "
+      data-testid="tab-specific"
+      (click)="setTab('specific')"
+      (keydown.enter)="setTab('specific')"
+      (keydown.space)="setTab('specific')"
+    >
+      Specific Dates
+      @if (sortedOverrideDates().length > 0) {
+        <span
+          class="ml-1.5 inline-flex items-center justify-center rounded-full bg-dt-primary/10 px-1.5 py-0.5 text-xs font-semibold text-dt-primary"
+        >
+          {{ sortedOverrideDates().length }}
+        </span>
+      }
+    </button>
+  </div>
+
+  <!-- ── Weekly Schedule Tab ──────────────────────────────────────────────── -->
+  @if (activeTab() === 'weekly') {
+    @if (loading()) {
+      <div class="flex justify-center py-16">
+        <output class="dt-spinner text-dt-primary"></output>
+      </div>
+    } @else if (error()) {
+      <div
+        class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4"
+        data-testid="availability-error"
+      >
+        {{ error() }}
+      </div>
+      <app-button variant="secondary" testId="retry-btn" (clicked)="load()">Retry</app-button>
+    } @else {
+      @if (saveSuccess()) {
+        <div
+          class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 mb-4"
+          data-testid="save-success"
+        >
+          Weekly schedule saved successfully.
+        </div>
+      }
+      @if (saveError()) {
+        <div
+          class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4"
+          data-testid="save-error"
+        >
+          {{ saveError() }}
+        </div>
+      }
+
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="divide-y divide-gray-100">
+          @for (day of days; track day.key) {
+            <div class="px-5 py-4" [attr.data-testid]="'day-row-' + day.key">
+              <!-- Day name + toggle row -->
+              <div class="flex items-center gap-3">
+                <span class="w-28 shrink-0 text-sm font-semibold text-gray-800">{{
+                  day.label
+                }}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  [attr.aria-checked]="dayAvailability(day.key).available"
+                  [attr.aria-label]="day.label + ' availability toggle'"
+                  [class]="
+                    dayAvailability(day.key).available
+                      ? 'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-dt-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-dt-primary focus:ring-offset-2'
+                      : 'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-dt-primary focus:ring-offset-2'
+                  "
+                  [attr.data-testid]="'toggle-' + day.key"
+                  (click)="toggleDay(day.key)"
+                  (keydown.enter)="toggleDay(day.key)"
+                  (keydown.space)="toggleDay(day.key)"
+                >
+                  <span
+                    [class]="
+                      dayAvailability(day.key).available
+                        ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200'
+                        : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200'
+                    "
+                  ></span>
+                </button>
+                <span
+                  class="text-xs font-medium"
+                  [class]="dayAvailability(day.key).available ? 'text-dt-primary' : 'text-gray-400'"
+                >
+                  {{ dayAvailability(day.key).available ? 'Available' : 'Unavailable' }}
+                </span>
+              </div>
+
+              <!-- Slots + max_shifts (only when available) -->
+              @if (dayAvailability(day.key).available) {
+                <div class="mt-3 ml-[148px] space-y-2">
+                  @for (slot of dayAvailability(day.key).slots ?? []; track $index) {
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="time"
+                        class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                        [class.border-red-400]="isSlotFromInvalid(day.key, $index)"
+                        [attr.data-testid]="'slot-from-' + day.key + '-' + $index"
+                        [value]="slot.from"
+                        (change)="setSlotFrom(day.key, $index, $any($event.target).value)"
+                      />
+                      <span class="text-xs text-gray-400">to</span>
+                      <input
+                        type="time"
+                        class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                        [class.border-red-400]="isSlotToInvalid(day.key, $index)"
+                        [attr.data-testid]="'slot-to-' + day.key + '-' + $index"
+                        [value]="slot.to"
+                        (change)="setSlotTo(day.key, $index, $any($event.target).value)"
+                      />
+                      @if ((dayAvailability(day.key).slots?.length ?? 0) > 1) {
+                        <button
+                          type="button"
+                          class="h-7 w-7 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors"
+                          [attr.data-testid]="'remove-slot-' + day.key + '-' + $index"
+                          [attr.aria-label]="'Remove slot ' + ($index + 1) + ' for ' + day.label"
+                          tabindex="-1"
+                          (click)="removeSlot(day.key, $index)"
+                          (keydown.enter)="removeSlot(day.key, $index)"
+                          (keydown.space)="removeSlot(day.key, $index)"
+                        >
+                          <svg
+                            class="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            stroke-width="2"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      }
+                    </div>
+                  }
+
+                  <!-- Add slot -->
+                  <button
+                    type="button"
+                    class="flex items-center gap-1 text-xs text-dt-primary hover:text-dt-primary/80 focus:outline-none focus:underline"
+                    [attr.data-testid]="'add-slot-' + day.key"
+                    (click)="addSlot(day.key)"
+                    (keydown.enter)="addSlot(day.key)"
+                    (keydown.space)="addSlot(day.key)"
+                  >
+                    <svg
+                      class="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add time slot
+                  </button>
+
+                  <!-- Max shifts -->
+                  @if ((dayAvailability(day.key).slots?.length ?? 0) > 1) {
+                    <div class="flex items-center gap-2 pt-1 border-t border-gray-100">
+                      <label
+                        [for]="'max-shifts-' + day.key"
+                        class="text-xs text-gray-500 whitespace-nowrap"
+                      >
+                        Willing to work
+                      </label>
+                      <select
+                        [id]="'max-shifts-' + day.key"
+                        class="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                        [attr.data-testid]="'max-shifts-' + day.key"
+                        [value]="dayAvailability(day.key).max_shifts ?? 1"
+                        (change)="setMaxShifts(day.key, +$any($event.target).value)"
+                      >
+                        @for (n of slotRange(day.key); track n) {
+                          <option [value]="n">{{ n }}</option>
+                        }
+                      </select>
+                      <span class="text-xs text-gray-500">
+                        shift(s) out of {{ dayAvailability(day.key).slots?.length }}
+                      </span>
+                    </div>
+                  }
+
+                  <!-- Validation error -->
+                  @if (submitted() && weeklyErrors()[day.key]) {
+                    <p class="text-xs text-red-600" [attr.data-testid]="'error-' + day.key">
+                      {{ weeklyErrors()[day.key] }}
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Footer -->
+        <div
+          class="flex flex-col gap-3 px-5 py-4 bg-gray-50 border-t border-gray-200 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="text-xs text-gray-400">
+            @if (lastSaved()) {
+              Last saved {{ lastSaved() | date: 'medium' }}
+            } @else {
+              Not saved yet
+            }
+          </div>
+          <app-button
+            variant="primary"
+            size="sm"
+            [loading]="saving()"
+            testId="save-availability-btn"
+            (clicked)="save()"
+          >
+            Save Schedule
+          </app-button>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ── Specific Dates Tab ───────────────────────────────────────────────── -->
+  @if (activeTab() === 'specific') {
+    @if (overridesLoading()) {
+      <div class="flex justify-center py-16">
+        <output class="dt-spinner text-dt-primary"></output>
+      </div>
+    } @else if (overridesError()) {
+      <div
+        class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4"
+        data-testid="overrides-error"
+      >
+        {{ overridesError() }}
+      </div>
+      <app-button variant="secondary" testId="retry-overrides-btn" (clicked)="loadOverrides()"
+        >Retry</app-button
+      >
+    } @else {
+      @if (overridesSaveSuccess() && !selectedDate()) {
+        <div
+          class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 mb-4"
+          data-testid="overrides-save-success"
+        >
+          Date override saved.
+        </div>
+      }
+      @if (overridesSaveError()) {
+        <div
+          class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4"
+          data-testid="overrides-save-error"
+        >
+          {{ overridesSaveError() }}
+        </div>
+      }
+
+      <!-- Calendar -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-4">
+        <!-- Calendar header -->
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <button
+            type="button"
+            class="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-dt-primary"
+            data-testid="cal-prev-month"
+            aria-label="Previous month"
+            (click)="prevMonth()"
+            (keydown.enter)="prevMonth()"
+            (keydown.space)="prevMonth()"
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <span class="text-sm font-semibold text-gray-800" data-testid="cal-month-label">
+            {{ calendarMonthLabel() }}
+          </span>
+          <button
+            type="button"
+            class="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-dt-primary"
+            data-testid="cal-next-month"
+            aria-label="Next month"
+            (click)="nextMonth()"
+            (keydown.enter)="nextMonth()"
+            (keydown.space)="nextMonth()"
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Day-of-week headers -->
+        <div class="grid grid-cols-7 border-b border-gray-100">
+          @for (label of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; track label) {
+            <div
+              class="py-2 text-center text-xs font-semibold uppercase tracking-widest text-gray-400"
+            >
+              {{ label }}
+            </div>
+          }
+        </div>
+
+        <!-- Calendar grid -->
+        <div class="grid grid-cols-7">
+          @for (cell of calendarDays(); track cell.date) {
+            <button
+              type="button"
+              class="relative flex flex-col items-center justify-start py-2 min-h-[52px] text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-dt-primary transition-colors"
+              [class]="
+                !cell.isCurrentMonth
+                  ? 'text-gray-300 hover:bg-gray-50'
+                  : selectedDate() === cell.date
+                    ? 'bg-dt-primary text-white font-semibold'
+                    : cell.isToday
+                      ? 'text-dt-primary font-bold hover:bg-dt-primary/5'
+                      : 'text-gray-700 hover:bg-gray-50'
+              "
+              [attr.data-testid]="'cal-day-' + cell.date"
+              [attr.aria-label]="cell.date + (cell.hasOverride ? ' (has override)' : '')"
+              [attr.aria-pressed]="selectedDate() === cell.date"
+              (click)="selectDate(cell.date)"
+              (keydown.enter)="selectDate(cell.date)"
+              (keydown.space)="selectDate(cell.date)"
+            >
+              <span>{{ cell.dayOfMonth }}</span>
+              @if (cell.hasOverride) {
+                <span
+                  class="mt-0.5 h-1.5 w-1.5 rounded-full"
+                  [class]="selectedDate() === cell.date ? 'bg-white' : 'bg-dt-primary'"
+                ></span>
+              }
+            </button>
+          }
+        </div>
+
+        <!-- Inline date editor -->
+        @if (selectedDate()) {
+          <div class="border-t border-gray-200 px-5 py-4 bg-gray-50" data-testid="date-editor">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm font-semibold text-gray-800">
+                {{ formatOverrideDate(selectedDate()!) }}
+              </p>
+              @if (overrides()[selectedDate()!]) {
+                <button
+                  type="button"
+                  class="text-xs text-red-500 hover:text-red-700 focus:outline-none focus:underline"
+                  data-testid="remove-override-btn"
+                  tabindex="-1"
+                  (click)="removeOverride(selectedDate()!)"
+                  (keydown.enter)="removeOverride(selectedDate()!)"
+                  (keydown.space)="removeOverride(selectedDate()!)"
+                >
+                  Remove override
+                </button>
+              }
+            </div>
+
+            <!-- Available toggle -->
+            <div class="flex items-center gap-2 mb-3">
+              <button
+                type="button"
+                role="switch"
+                [attr.aria-checked]="draftAvailability().available"
+                aria-label="Available on this date"
+                [class]="
+                  draftAvailability().available
+                    ? 'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-dt-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-dt-primary focus:ring-offset-2'
+                    : 'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-dt-primary focus:ring-offset-2'
+                "
+                data-testid="draft-toggle"
+                (click)="toggleDraft()"
+                (keydown.enter)="toggleDraft()"
+                (keydown.space)="toggleDraft()"
+              >
+                <span
+                  [class]="
+                    draftAvailability().available
+                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200'
+                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200'
+                  "
+                ></span>
+              </button>
+              <span
+                class="text-xs font-medium"
+                [class]="draftAvailability().available ? 'text-dt-primary' : 'text-gray-400'"
+              >
+                {{ draftAvailability().available ? 'Available' : 'Unavailable' }}
+              </span>
+            </div>
+
+            <!-- Slots (when available) -->
+            @if (draftAvailability().available) {
+              <div class="space-y-2 ml-0">
+                @for (slot of draftAvailability().slots ?? []; track $index) {
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="time"
+                      class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                      [class.border-red-400]="isDraftSlotFromInvalid($index)"
+                      [attr.data-testid]="'draft-slot-from-' + $index"
+                      [value]="slot.from"
+                      (change)="setDraftSlotFrom($index, $any($event.target).value)"
+                    />
+                    <span class="text-xs text-gray-400">to</span>
+                    <input
+                      type="time"
+                      class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                      [class.border-red-400]="isDraftSlotToInvalid($index)"
+                      [attr.data-testid]="'draft-slot-to-' + $index"
+                      [value]="slot.to"
+                      (change)="setDraftSlotTo($index, $any($event.target).value)"
+                    />
+                    @if ((draftAvailability().slots?.length ?? 0) > 1) {
+                      <button
+                        type="button"
+                        class="h-7 w-7 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors"
+                        [attr.data-testid]="'remove-draft-slot-' + $index"
+                        [attr.aria-label]="'Remove slot ' + ($index + 1)"
+                        tabindex="-1"
+                        (click)="removeDraftSlot($index)"
+                        (keydown.enter)="removeDraftSlot($index)"
+                        (keydown.space)="removeDraftSlot($index)"
+                      >
+                        <svg
+                          class="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    }
+                  </div>
+                }
+
+                <!-- Add slot -->
+                <button
+                  type="button"
+                  class="flex items-center gap-1 text-xs text-dt-primary hover:text-dt-primary/80 focus:outline-none focus:underline"
+                  data-testid="add-draft-slot"
+                  (click)="addDraftSlot()"
+                  (keydown.enter)="addDraftSlot()"
+                  (keydown.space)="addDraftSlot()"
+                >
+                  <svg
+                    class="h-3.5 w-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add time slot
+                </button>
+
+                <!-- Max shifts -->
+                @if ((draftAvailability().slots?.length ?? 0) > 1) {
+                  <div class="flex items-center gap-2 pt-1 border-t border-gray-100">
+                    <label for="draft-max-shifts" class="text-xs text-gray-500 whitespace-nowrap">
+                      Willing to work
+                    </label>
+                    <select
+                      id="draft-max-shifts"
+                      class="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                      data-testid="draft-max-shifts"
+                      [value]="draftAvailability().max_shifts ?? 1"
+                      (change)="setDraftMaxShifts(+$any($event.target).value)"
+                    >
+                      @for (n of draftSlotRange(); track n) {
+                        <option [value]="n">{{ n }}</option>
+                      }
+                    </select>
+                    <span class="text-xs text-gray-500">
+                      shift(s) out of {{ draftAvailability().slots?.length }}
+                    </span>
+                  </div>
+                }
+
+                @if (draftSubmitted() && draftError()) {
+                  <p class="text-xs text-red-600" data-testid="draft-error">{{ draftError() }}</p>
+                }
+
+                <div class="pt-1">
+                  <app-button
+                    variant="primary"
+                    size="sm"
+                    [loading]="overridesSaving()"
+                    testId="apply-override-btn"
+                    (clicked)="applyDateOverride()"
+                  >
+                    Apply
+                  </app-button>
+                </div>
+              </div>
+            } @else {
+              <div class="mt-2">
+                <app-button
+                  variant="primary"
+                  size="sm"
+                  [loading]="overridesSaving()"
+                  testId="apply-override-btn"
+                  (clicked)="applyDateOverride()"
+                >
+                  Save as Unavailable
+                </app-button>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Footer -->
+        <div class="px-5 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-400">
+          @if (overridesLastSaved()) {
+            Last saved {{ overridesLastSaved() | date: 'medium' }}
+          } @else {
+            Click a date to add an override
+          }
+        </div>
+      </div>
+
+      <!-- Override list -->
+      @if (sortedOverrideDates().length > 0) {
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-3 bg-gray-50 border-b border-gray-200">
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400">
+              Current Overrides
+            </h2>
+          </div>
+          <div class="divide-y divide-gray-100">
+            @for (date of sortedOverrideDates(); track date) {
+              <div
+                class="flex items-start justify-between px-5 py-3 hover:bg-gray-50"
+                [attr.data-testid]="'override-row-' + date"
+              >
+                <div>
+                  <p class="text-sm font-medium text-gray-800">{{ formatOverrideDate(date) }}</p>
+                  @if (overrides()[date].available && overrides()[date].slots?.length) {
+                    <div class="mt-0.5 space-y-0.5">
+                      @for (slot of overrides()[date].slots!; track $index) {
+                        <p class="text-xs text-gray-500">
+                          {{ formatTime(slot.from) }} – {{ formatTime(slot.to) }}
+                        </p>
+                      }
+                      @if ((overrides()[date].slots?.length ?? 0) > 1) {
+                        <p class="text-xs text-gray-400 italic">
+                          Up to {{ overrides()[date].max_shifts }} shift(s)
+                        </p>
+                      }
+                    </div>
+                  } @else {
+                    <p class="text-xs text-gray-500">Unavailable</p>
+                  }
+                </div>
+                <div class="flex items-center gap-3 shrink-0 ml-4">
+                  <button
+                    type="button"
+                    class="text-xs text-dt-primary hover:underline focus:outline-none focus:underline"
+                    [attr.data-testid]="'edit-override-' + date"
+                    tabindex="-1"
+                    (click)="setTab('specific'); selectDate(date)"
+                    (keydown.enter)="setTab('specific'); selectDate(date)"
+                    (keydown.space)="setTab('specific'); selectDate(date)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="text-xs text-red-500 hover:text-red-700 focus:outline-none focus:underline"
+                    [attr.data-testid]="'remove-override-list-' + date"
+                    tabindex="-1"
+                    (click)="removeOverride(date)"
+                    (keydown.enter)="removeOverride(date)"
+                    (keydown.space)="removeOverride(date)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="text-center py-8 text-sm text-gray-400" data-testid="no-overrides">
+          No date-specific overrides yet. Click any date above to add one.
+        </div>
+      }
+    }
+  }
+</div>

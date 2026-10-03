@@ -1,0 +1,18 @@
+meta {
+  name: Update Organization
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{base_url}}/organizations/{{org_id}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Updated YMCA Branch",
+    "address": "456 Oak Ave, Springfield, IL 62702"
+  }
+}

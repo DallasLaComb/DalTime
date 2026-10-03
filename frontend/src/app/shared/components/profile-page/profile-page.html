@@ -1,0 +1,221 @@
+<div class="dt-debug max-w-2xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">My Profile</h1>
+    @if (showDashboard()) {
+      <app-button
+        variant="secondary"
+        size="sm"
+        testId="go-to-dashboard-btn"
+        (clicked)="navigatedBack.emit()"
+      >
+        Dashboard
+      </app-button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="flex justify-center py-16">
+      <output class="dt-spinner text-dt-primary"></output>
+    </div>
+  } @else if (loadError()) {
+    <div
+      class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4"
+      data-testid="profile-error"
+    >
+      {{ loadError() }}
+    </div>
+    <app-button variant="secondary" testId="retry-btn" (clicked)="retried.emit()">Retry</app-button>
+  } @else if (profile()) {
+    @if (saveSuccess()) {
+      <div
+        class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 mb-4"
+        data-testid="save-success"
+      >
+        Profile updated successfully.
+      </div>
+    }
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+      <!-- Email (read-only) -->
+      <div class="px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Email</p>
+        <p class="text-sm text-gray-900" data-testid="profile-email">{{ profile()!.email }}</p>
+      </div>
+
+      <!-- Editable fields -->
+      @if (editing()) {
+        <div class="px-6 py-4">
+          @if (saveError()) {
+            <div
+              class="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800 mb-3"
+              data-testid="save-error"
+            >
+              {{ saveError() }}
+            </div>
+          }
+
+          <div class="mb-3">
+            <label
+              for="edit-first-name"
+              class="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1"
+              >First Name</label
+            >
+            <input
+              id="edit-first-name"
+              type="text"
+              class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+              [class.input-error]="editSubmitted() && !editFirstName().trim()"
+              data-testid="edit-first-name-input"
+              [value]="editFirstName()"
+              (input)="editFirstName.set($any($event.target).value)"
+              autocomplete="given-name"
+            />
+            @if (editSubmitted() && !editFirstName().trim()) {
+              <p class="input-feedback" data-testid="first-name-error">First name is required</p>
+            }
+          </div>
+
+          <div class="mb-3">
+            <label
+              for="edit-last-name"
+              class="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1"
+              >Last Name</label
+            >
+            <input
+              id="edit-last-name"
+              type="text"
+              class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+              [class.input-error]="editSubmitted() && !editLastName().trim()"
+              data-testid="edit-last-name-input"
+              [value]="editLastName()"
+              (input)="editLastName.set($any($event.target).value)"
+              autocomplete="family-name"
+            />
+            @if (editSubmitted() && !editLastName().trim()) {
+              <p class="input-feedback" data-testid="last-name-error">Last name is required</p>
+            }
+          </div>
+
+          <div class="mb-4">
+            <label
+              for="edit-phone"
+              class="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1"
+              >Phone</label
+            >
+            <input
+              id="edit-phone"
+              type="tel"
+              inputmode="tel"
+              [class.input-error]="editSubmitted() && phoneMessage()"
+              class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+              data-testid="edit-phone-input"
+              [value]="editPhone()"
+              (input)="editPhone.set($any($event.target).value)"
+              autocomplete="tel"
+            />
+            @if (editSubmitted() && phoneMessage(); as msg) {
+              <p class="input-feedback" data-testid="phone-error">{{ msg }}</p>
+            }
+          </div>
+
+          <div class="flex gap-2">
+            <app-button
+              variant="secondary"
+              size="sm"
+              testId="cancel-edit-btn"
+              (clicked)="cancelEdit()"
+              >Cancel</app-button
+            >
+            <app-button
+              variant="primary"
+              size="sm"
+              [loading]="saving()"
+              testId="save-btn"
+              (clicked)="save()"
+              >Save</app-button
+            >
+          </div>
+        </div>
+      } @else {
+        <div class="px-6 py-4">
+          <div class="flex justify-between items-start">
+            <div class="space-y-4">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+                  First Name
+                </p>
+                <p class="text-sm text-gray-900" data-testid="profile-first-name">
+                  {{ profile()!.first_name }}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+                  Last Name
+                </p>
+                <p class="text-sm text-gray-900" data-testid="profile-last-name">
+                  {{ profile()!.last_name }}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">
+                  Phone
+                </p>
+                <p class="text-sm text-gray-900" data-testid="profile-phone">
+                  <app-phone-display [phone]="profile()!.phone" />
+                </p>
+              </div>
+            </div>
+            <app-button
+              variant="primary-outline"
+              size="sm"
+              testId="edit-btn"
+              (clicked)="startEdit()"
+              >Edit</app-button
+            >
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (biometricLock.supported()) {
+      <div
+        class="mt-4 bg-white rounded-xl border border-gray-200 shadow-sm px-6 py-4"
+        data-testid="biometric-lock-section"
+      >
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <label for="biometric-lock-toggle" class="text-sm font-medium text-gray-900">
+              Unlock with {{ biometricLock.label() }}
+            </label>
+            <p class="text-xs text-gray-500">
+              Ask for {{ biometricLock.label() }} when you open the app.
+            </p>
+          </div>
+          <input
+            id="biometric-lock-toggle"
+            type="checkbox"
+            class="h-6 w-6 shrink-0 rounded border-gray-300 text-dt-primary focus:ring-dt-secondary"
+            data-testid="biometric-lock-toggle"
+            [checked]="biometricLock.enabled()"
+            (change)="onBiometricToggled($event)"
+          />
+        </div>
+        @if (biometricLock.hasCredentials()) {
+          <div class="mt-3 flex items-center justify-between gap-4 border-t border-gray-100 pt-3">
+            <p class="text-xs text-gray-500">
+              Your sign-in is saved on this device, so {{ biometricLock.label() }} works even after
+              you sign out.
+            </p>
+            <app-button
+              variant="danger-outline"
+              size="sm"
+              testId="biometric-forget-btn"
+              (clicked)="biometricLock.clearCredentials()"
+              >Forget</app-button
+            >
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

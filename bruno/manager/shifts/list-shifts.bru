@@ -1,0 +1,70 @@
+meta {
+  name: List Manager Shifts
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/manager/shifts?month=2026-07
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{manager_token}}
+}
+
+docs {
+  Returns all shift records for the calling manager for the given calendar month,
+  including draft, published, and draft_failed sentinel records.
+
+  Query param: month=YYYY-MM (defaults to current month if omitted)
+
+  Response 200:
+  [
+    {
+      "shift_id": "abc-123",
+      "org_id": "org-sunset",
+      "manager_id": "mgr-001",
+      "employee_id": "emp-001",
+      "employee_name": "Alice Smith",
+      "location_id": "loc-1",
+      "location_name": "Main Floor",
+      "date": "2026-07-01",
+      "start_time": "09:00",
+      "end_time": "17:00",
+      "type": "morning",
+      "status": "draft",
+      "created_at": "2026-07-01T00:00:00.000Z",
+      "updated_at": "2026-07-01T00:00:00.000Z"
+    },
+    {
+      "shift_id": "FAILED#mgr-001#2026-07-02#loc-1#09:00#17:00",
+      "org_id": "org-sunset",
+      "manager_id": "mgr-001",
+      "employee_id": "",
+      "employee_name": "",
+      "location_id": "loc-1",
+      "location_name": "Main Floor",
+      "date": "2026-07-02",
+      "start_time": "09:00",
+      "end_time": "17:00",
+      "type": "morning",
+      "status": "draft_failed",
+      "created_at": "2026-07-01T00:00:00.000Z",
+      "updated_at": "2026-07-01T00:00:00.000Z"
+    }
+  ]
+
+  status enum values:
+    "draft"        — generated draft shift assigned to an employee
+    "published"    — shift published and visible to the assigned employee
+    "draft_failed" — unfillable slot sentinel: no eligible employee was found
+                     during draft generation; employee_id and employee_name are ""
+
+  Response 400 (bad month format):
+  { "error": "month must be in YYYY-MM format" }
+
+  Response 403 (caller not provisioned as manager):
+  { "error": "Caller organization could not be resolved" }
+}

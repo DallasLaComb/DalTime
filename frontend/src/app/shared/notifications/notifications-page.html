@@ -1,0 +1,112 @@
+<div class="min-h-screen bg-neutral-50">
+  <div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+    <!-- Page header row: title + mark-all action -->
+    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1
+          class="text-2xl font-semibold text-neutral-900"
+          data-testid="notifications-page-heading"
+        >
+          Notifications
+        </h1>
+        @if (hasUnread()) {
+          <p
+            class="mt-1 text-sm text-neutral-500"
+            data-testid="notifications-unread-summary"
+            aria-live="polite"
+          >
+            {{ unreadCount() }} unread
+          </p>
+        }
+      </div>
+
+      <app-button
+        variant="primary-outline"
+        size="md"
+        testId="notifications-mark-all-read"
+        [disabled]="!hasUnread()"
+        [loading]="markingAll()"
+        (clicked)="markAllAsRead()"
+      >
+        Mark all as read
+      </app-button>
+    </div>
+
+    <!-- Error alert — shown when list or mark-read fails -->
+    @if (error()) {
+      <div class="mb-4">
+        <app-error-alert [message]="error()!" [retryable]="true" (retry)="retryLoad()" />
+      </div>
+    }
+
+    <!-- Main content area -->
+    @if (loading()) {
+      <app-loading-spinner label="Loading notifications..." />
+    } @else if (notifications().length === 0 && !error()) {
+      <app-empty-state
+        title="No notifications"
+        description="You're all caught up — new notifications will appear here."
+      />
+    } @else {
+      <!-- Notification list — card-style layout that collapses cleanly on mobile -->
+      <ul
+        class="flex flex-col gap-3"
+        aria-label="Notifications list"
+        data-testid="notifications-list"
+      >
+        @for (notification of notifications(); track trackByNotificationId($index, notification)) {
+          <li>
+            <div
+              class="flex w-full items-start gap-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition-colors hover:bg-neutral-50"
+              [class.border-blue-200]="!notification.read"
+              [class.bg-blue-50]="!notification.read"
+              [class.hover:bg-blue-100]="!notification.read"
+              role="button"
+              tabindex="0"
+              [attr.aria-label]="
+                (notification.read ? 'Read notification: ' : 'Unread notification: ') +
+                notification.message
+              "
+              [attr.data-testid]="'notification-item-' + notification.notification_id"
+              (click)="markOneAsRead(notification)"
+              (keydown.enter)="markOneAsRead(notification)"
+              (keydown.space)="$event.preventDefault(); markOneAsRead(notification)"
+            >
+              <!-- Type icon — decorative, hidden from screen readers -->
+              <span class="mt-0.5 shrink-0 text-xl" aria-hidden="true">
+                {{ getDisplay(notification.type).icon }}
+              </span>
+
+              <!-- Message and metadata -->
+              <div class="min-w-0 flex-1">
+                <p
+                  class="text-sm text-neutral-900"
+                  [class.font-semibold]="!notification.read"
+                  [attr.data-testid]="'notification-message-' + notification.notification_id"
+                >
+                  {{ notification.message }}
+                </p>
+                <p class="mt-1 text-xs text-neutral-500">
+                  <span>{{ getDisplay(notification.type).label }}</span>
+                  <span aria-hidden="true"> · </span>
+                  <time [dateTime]="notification.created_at">
+                    {{ formatTimestamp(notification.created_at) }}
+                  </time>
+                </p>
+              </div>
+
+              <!-- Unread indicator dot — never color-only (aria-label on the parent item also conveys state) -->
+              @if (!notification.read) {
+                <span
+                  class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600"
+                  aria-hidden="true"
+                  [attr.data-testid]="'notification-unread-dot-' + notification.notification_id"
+                ></span>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</div>

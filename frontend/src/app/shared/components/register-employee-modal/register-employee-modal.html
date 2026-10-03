@@ -1,0 +1,191 @@
+<div class="dt-debug">
+  @if (open()) {
+    <div class="fixed inset-0 bg-black/50 z-40"></div>
+    <div
+      class="fixed inset-0 z-50 flex items-end pt-safe-top pb-safe-bottom sm:items-center justify-center sm:p-4"
+      tabindex="-1"
+      data-testid="register-modal"
+      (click)="cancel()"
+      (keydown.escape)="cancel()"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        class="w-full sm:max-w-lg"
+        tabindex="-1"
+        (click)="$event.stopPropagation()"
+        (keydown)="$event.stopPropagation()"
+      >
+        <div
+          class="bg-white shadow-xl sm:rounded-xl max-h-safe-dvh sm:max-h-[90vh] overflow-y-auto"
+        >
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <h5 class="text-lg font-semibold text-gray-900">Register {{ entityLabel() }}</h5>
+            <button
+              type="button"
+              class="text-gray-400 hover:text-gray-600 transition-colors text-2xl leading-none -m-2.5 min-w-11 p-2.5"
+              data-testid="close-register-modal-btn"
+              (click)="cancel()"
+            >
+              &times;
+            </button>
+          </div>
+          <div class="px-6 py-4 space-y-4">
+            @if (error()) {
+              <div
+                class="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800"
+                data-testid="modal-error"
+              >
+                {{ error() }}
+              </div>
+            }
+            <div>
+              <label for="empFirstName" class="block text-sm font-medium text-gray-700 mb-1"
+                >First Name</label
+              >
+              <input
+                type="text"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                [class.input-error]="formSubmitted() && !formFirstName().trim()"
+                id="empFirstName"
+                data-testid="first-name-input"
+                [value]="formFirstName()"
+                (input)="formFirstName.set($any($event.target).value)"
+                placeholder="First name"
+                autocomplete="given-name"
+              />
+              @if (formSubmitted() && !formFirstName().trim()) {
+                <p class="input-feedback" data-testid="first-name-error">First name is required</p>
+              }
+            </div>
+            <div>
+              <label for="empLastName" class="block text-sm font-medium text-gray-700 mb-1"
+                >Last Name</label
+              >
+              <input
+                type="text"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                [class.input-error]="formSubmitted() && !formLastName().trim()"
+                id="empLastName"
+                data-testid="last-name-input"
+                [value]="formLastName()"
+                (input)="formLastName.set($any($event.target).value)"
+                placeholder="Last name"
+                autocomplete="family-name"
+              />
+              @if (formSubmitted() && !formLastName().trim()) {
+                <p class="input-feedback" data-testid="last-name-error">Last name is required</p>
+              }
+            </div>
+            <div>
+              <label for="empEmail" class="block text-sm font-medium text-gray-700 mb-1"
+                >Email</label
+              >
+              <input
+                type="email"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                [class.input-error]="formSubmitted() && emailMessage()"
+                id="empEmail"
+                data-testid="email-input"
+                [value]="formEmail()"
+                (input)="formEmail.set($any($event.target).value)"
+                [placeholder]="emailPlaceholder()"
+                autocomplete="email"
+              />
+              @if (formSubmitted() && emailMessage(); as msg) {
+                <p class="input-feedback" data-testid="email-error">{{ msg }}</p>
+              }
+            </div>
+            <div>
+              <label for="empPhone" class="block text-sm font-medium text-gray-700 mb-1"
+                >Phone <span class="text-gray-400">(optional)</span></label
+              >
+              <input
+                type="tel"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                inputmode="tel"
+                [class.input-error]="formSubmitted() && phoneMessage()"
+                id="empPhone"
+                data-testid="phone-input"
+                [value]="formPhone()"
+                (input)="formPhone.set($any($event.target).value)"
+                placeholder="(555) 123-4567"
+                autocomplete="tel"
+              />
+              @if (formSubmitted() && phoneMessage(); as msg) {
+                <p class="input-feedback" data-testid="phone-error">{{ msg }}</p>
+              }
+            </div>
+            @if (managers().length > 0) {
+              <div>
+                <label for="empManager" class="block text-sm font-medium text-gray-700 mb-1"
+                  >Manager</label
+                >
+                <select
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base shadow-sm focus:border-dt-secondary focus:outline-none focus:ring-1 focus:ring-dt-secondary"
+                  [class.input-error]="formSubmitted() && requireManager() && !formManagerId()"
+                  id="empManager"
+                  data-testid="manager-select"
+                  [value]="formManagerId()"
+                  (change)="formManagerId.set($any($event.target).value)"
+                >
+                  <option value="">Select a manager</option>
+                  @for (manager of managers(); track manager.manager_id) {
+                    <option [value]="manager.manager_id">
+                      {{ manager.first_name }} {{ manager.last_name }}
+                    </option>
+                  }
+                </select>
+                @if (formSubmitted() && requireManager() && !formManagerId()) {
+                  <p class="input-feedback" data-testid="manager-error">Manager is required</p>
+                }
+              </div>
+            } @else if (managers().length === 0 && requireManager()) {
+              <div>
+                <label for="empManagerDisabled" class="block text-sm font-medium text-gray-700 mb-1"
+                  >Manager <span class="text-gray-400">(optional)</span></label
+                >
+                <input
+                  type="text"
+                  class="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-base text-gray-400"
+                  id="empManagerDisabled"
+                  value="No managers available"
+                  disabled
+                />
+              </div>
+            }
+            <app-password-input
+              inputId="empPassword"
+              label="Temporary Password"
+              testId="password-input"
+              placeholder="Temporary password"
+              autocomplete="new-password"
+              [value]="formPassword()"
+              [hasError]="formSubmitted() && !formPassword().trim()"
+              errorMessage="Temporary password is required"
+              errorTestId="password-error"
+              (valueChange)="formPassword.set($event)"
+            />
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 px-6 py-4 border-t border-gray-200">
+            <app-button
+              variant="secondary"
+              [fullWidth]="true"
+              testId="cancel-register-btn"
+              (clicked)="cancel()"
+              >Cancel</app-button
+            >
+            <app-button
+              variant="primary"
+              [fullWidth]="true"
+              [loading]="saving()"
+              testId="save-register-btn"
+              (clicked)="register()"
+              >Register</app-button
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>

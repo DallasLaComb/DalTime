@@ -1,0 +1,148 @@
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold text-gray-900 mb-1">Impersonate User</h1>
+  <p class="text-sm text-gray-500 mb-8">
+    Select an organisation, role, and user to view the app as that user. An orange banner will
+    appear while you are impersonating. Click&nbsp;<strong>Exit</strong> to return.
+  </p>
+
+  <!-- Step 1: Organisation -->
+  <section class="mb-8">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+      1 — Select Organisation
+    </h2>
+
+    @if (orgsLoading()) {
+      <p class="text-sm text-gray-500" data-testid="orgs-loading">Loading organisations…</p>
+    } @else if (orgsError()) {
+      <p class="text-sm text-red-600" data-testid="orgs-error">{{ orgsError() }}</p>
+    } @else if (orgs().length === 0) {
+      <p class="text-sm text-gray-500" data-testid="orgs-empty">No organisations found.</p>
+    } @else {
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="org-list">
+        @for (org of orgs(); track org.org_id) {
+          <button
+            type="button"
+            class="text-left px-4 py-3 rounded-lg border transition-colors"
+            [class]="
+              selectedOrgId() === org.org_id
+                ? 'border-dt-primary bg-dt-primary/5 text-dt-primary font-medium'
+                : 'border-gray-200 bg-white hover:border-dt-primary/50 text-gray-700'
+            "
+            [attr.data-testid]="'org-' + org.org_id"
+            (click)="selectOrg(org.org_id)"
+            (keydown.enter)="selectOrg(org.org_id)"
+            (keydown.space)="selectOrg(org.org_id)"
+            tabindex="0"
+          >
+            <div class="font-medium">{{ org.name }}</div>
+            <div class="text-xs text-gray-400 mt-0.5">{{ org.address }}</div>
+          </button>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- Step 2: Role -->
+  @if (selectedOrgId()) {
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        2 — Select Role
+      </h2>
+      <div class="flex flex-wrap gap-2" data-testid="role-list">
+        @for (r of roles; track r.value) {
+          <button
+            type="button"
+            class="px-4 py-2 rounded-full border text-sm font-medium transition-colors"
+            [class]="
+              selectedRole() === r.value
+                ? 'border-dt-primary bg-dt-primary text-white'
+                : 'border-gray-300 bg-white text-gray-700 hover:border-dt-primary/60'
+            "
+            [attr.data-testid]="'role-' + r.value"
+            (click)="selectRole(r.value)"
+            (keydown.enter)="selectRole(r.value)"
+            (keydown.space)="selectRole(r.value)"
+            tabindex="0"
+          >
+            {{ r.label }}
+          </button>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- Step 3: Users -->
+  @if (selectedRole()) {
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        3 — Select User
+      </h2>
+
+      @if (usersLoading()) {
+        <p class="text-sm text-gray-500" data-testid="users-loading">Loading users…</p>
+      } @else if (usersError()) {
+        <p class="text-sm text-red-600" data-testid="users-error">{{ usersError() }}</p>
+      } @else if (users().length === 0) {
+        <p class="text-sm text-gray-500" data-testid="users-empty">
+          No {{ selectedRole() }} users found in this organisation.
+        </p>
+      } @else {
+        <div
+          class="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden"
+          data-testid="user-list"
+        >
+          @for (user of users(); track user.user_id) {
+            <button
+              type="button"
+              class="w-full text-left px-4 py-3 flex items-center justify-between transition-colors"
+              [class]="
+                selectedUserId() === user.user_id
+                  ? 'bg-dt-primary/5 border-l-2 border-dt-primary'
+                  : 'bg-white hover:bg-gray-50'
+              "
+              [attr.data-testid]="'user-' + user.user_id"
+              (click)="selectUser(user.user_id)"
+              (keydown.enter)="selectUser(user.user_id)"
+              (keydown.space)="selectUser(user.user_id)"
+              tabindex="0"
+            >
+              <div>
+                <div class="font-medium text-gray-900">{{ user.display_name }}</div>
+                <div class="text-xs text-gray-400">{{ user.email }}</div>
+              </div>
+              <span
+                class="text-xs px-2 py-0.5 rounded-full"
+                [class]="
+                  user.status === 'CONFIRMED'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-amber-100 text-amber-700'
+                "
+                >{{ user.status }}</span
+              >
+            </button>
+          }
+        </div>
+      }
+    </section>
+  }
+
+  <!-- Action buttons -->
+  @if (startError()) {
+    <p class="text-sm text-red-600 mb-3" data-testid="start-error">{{ startError() }}</p>
+  }
+
+  <div class="flex gap-3">
+    <app-button
+      variant="primary"
+      [disabled]="!selectedUserId() || starting()"
+      [loading]="starting()"
+      testId="start-impersonation"
+      (clicked)="startImpersonation()"
+    >
+      View as {{ selectedUser()?.display_name ?? 'User' }}
+    </app-button>
+    <app-button variant="secondary" testId="cancel-impersonation" (clicked)="cancel()">
+      Cancel
+    </app-button>
+  </div>
+</div>

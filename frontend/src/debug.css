@@ -1,0 +1,13 @@
+/*
+ * ── Debug / Troubleshoot ──
+ * Highlights every shared/reusable component with a red border so you can
+ * visually verify that a page is composed entirely of reusable components.
+ *
+ * Active automatically in local/development builds (ng serve).
+ * Replaced by debug.noop.css (empty) in all deployed builds (dev/qa/prod)
+ * via angular.json fileReplacements — no manual toggle needed.
+ */
+/* .dt-debug {
+  border: 3px solid red !important;
+  padding: 3px !important;
+} */

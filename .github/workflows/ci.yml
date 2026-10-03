@@ -1,0 +1,267 @@
+# Runs unit and integration tests for the frontend and backend.
+# This is the first stage of the pipeline: push to dev → CI → Deploy to dev.
+# CI only runs on dev. QA and main are promoted from the last successful dev CI artifact
+# when a PR from dev→qa or qa→main is merged — no rebuild, no retest.
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+# Frontend and backend jobs run in parallel for faster feedback.
+# Both must pass for the workflow to succeed and trigger CD.
+jobs:
+  # ── Contract Drift Check ──
+  # Regenerates contracts/openapi.json from the Zod schemas and the frontend's
+  # generated types from that spec, then fails if either differs from what is
+  # committed. This is what makes the contract the single source of truth: a
+  # schema change that was not regenerated, or a generated file edited by hand,
+  # breaks the build here rather than silently drifting from the other side.
+  contracts:
+    name: Contract drift check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+
+      - name: Install contract dependencies
+        run: npm ci
+        working-directory: contracts
+
+      - name: Regenerate openapi.json
+        run: npm run generate
+        working-directory: contracts
+
+      # Only the generator's own dependency is needed to regenerate the frontend
+      # types, so this skips the full Angular install.
+      - name: Install openapi-typescript
+        run: npm ci --omit=optional --ignore-scripts
+        working-directory: frontend
+
+      - name: Regenerate frontend types
+        run: npm run contracts:types
+        working-directory: frontend
+
+      # Routes are declared only in infra/template.yaml. This fails if a route ships with
+      # no contract operation, or an operation is documented for a route that does not exist.
+      - name: Check template routes match the contract
+        run: npm run check:routes
+        working-directory: contracts
+
+      - name: Fail if generated output drifted from the committed files
+        run: |
+          if ! git diff --exit-code -- contracts/openapi.json frontend/src/app/core/generated/; then
+            echo "::error::Generated contract output is out of date."
+            echo "Run 'npm run generate' in contracts/ and 'npm run contracts:types' in frontend/, then commit the result."
+            exit 1
+          fi
+
+  # ── Frontend Tests ──
+  # Runs Angular unit tests via Vitest (configured in angular.json with @angular/build:unit-test)
+  frontend:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # Clone the repository into the runner
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      # Install Node.js and cache npm dependencies to speed up subsequent runs
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Clean install from lockfile — ensures reproducible builds
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      # continue-on-error: known Angular 21.x high-severity advisories (GHSA-p3vc-36g9-x9gr,
+      # GHSA-q6f4-qqrg-jv6x, GHSA-48r7-hpm6-gfxm, GHSA-39pv-4j6c-2g6v) require upgrading
+      # to Angular 22 — a major version upgrade coordinated with angular-frontend-agent.
+      # piscina (transitive via @angular/build) also has no available patch.
+      # Blocked by: angular major upgrade story (open action item). Remove continue-on-error
+      # once Angular 22 migration is complete and npm audit passes clean.
+      - name: npm audit
+        run: npm audit --audit-level=high
+        working-directory: frontend
+        continue-on-error: true
+
+      # Includes the ban on injecting HttpClient outside core/api/api-client.ts, which keeps
+      # every API call typed from contracts/openapi.json.
+      - name: Lint
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Run tests
+        run: npm test
+        working-directory: frontend
+
+      # Build the Angular app with placeholder values for environment-specific config.
+      # CD will replace placeholders (e.g. __API_BASE_URL__, __VITE_COGNITO_*) with
+      # real values from GitHub Actions variables when deploying to each environment.
+      - name: Build Angular app
+        run: npm run build
+        working-directory: frontend
+
+      # Upload the compiled Angular app so CD can deploy the exact build that passed tests.
+      # This artifact is reused for dev, qa, and main — no rebuild happens on promotion.
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-build
+          path: frontend/dist/frontend/browser/
+          retention-days: 7
+
+  # ── Backend Tests ──
+  # Runs unit and integration tests for the Lambda-based backend.
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # Clone the repository into the runner
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      # Install Node.js and cache npm dependencies to speed up subsequent runs
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # The backend depends on @daltime/contracts as `file:vendor/contracts` — a
+      # built copy mirrored into the SAM CodeUri, because SAM's esbuild builder
+      # copies only backend/ to a scratch dir and cannot resolve a path outside
+      # it. The vendored copy must therefore exist *before* `npm ci` runs.
+      - name: Install contract dependencies
+        run: npm ci
+        working-directory: contracts
+
+      - name: Build and vendor contracts into the backend
+        run: node scripts/sync-contracts.mjs
+        working-directory: backend
+
+      # Clean install from lockfile — ensures reproducible builds
+      - name: Install dependencies
+        run: npm ci
+        working-directory: backend
+
+      # Scoped to production dependencies: only these are bundled into the Lambda
+      # artifact, so only these are reachable at runtime. Dev-only build tooling
+      # (esbuild/nanoid/postcss) carries advisories that cannot affect the deployed
+      # function. Keep this a hard gate — prod deps must stay clean.
+      - name: npm audit
+        run: npm audit --audit-level=high --omit=dev
+        working-directory: backend
+
+      - name: Lint
+        run: npm run lint
+        working-directory: backend
+
+      # Handlers and services must fit the contract types (vendored above).
+      - name: Type-check source
+        run: npx tsc --noEmit
+        working-directory: backend
+
+      # Same for test fixtures. vitest strips types without checking them, so this is the only
+      # thing that notices a fixture drifting from the contract.
+      - name: Type-check tests
+        run: npm run typecheck:tests
+        working-directory: backend
+
+      - name: Run tests
+        run: npm test
+        working-directory: backend
+
+      # Install the AWS SAM CLI for building the serverless backend
+      - name: Setup SAM CLI
+        uses: aws-actions/setup-sam@89ddb14d60e682855e3fea4be85b3c56485de310 # v3
+
+      # Build the SAM application — compiles Lambda functions and resolves dependencies.
+      # Adds node_modules/.bin to PATH so SAM can find locally installed tools (e.g. esbuild).
+      - name: Build SAM application
+        run: sam build --template-file ../infra/template.yaml
+        working-directory: backend
+        env:
+          PATH: ${{ github.workspace }}/backend/node_modules/.bin:$PATH
+
+      # Upload the SAM build output so CD can deploy the exact build that passed tests.
+      # This artifact is reused for dev, qa, and main — no rebuild happens on promotion.
+      - name: Upload SAM build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sam-build
+          path: backend/.aws-sam/build/
+          retention-days: 7
+
+  # ── CodeQL Security Scan ──
+  # Scans TypeScript/JavaScript for security vulnerabilities and code quality issues.
+  # Results appear in the GitHub Security tab under Code Scanning.
+  codeql:
+    name: CodeQL security scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+
+  # ── Infra Checks ──
+  # Lints CloudFormation/SAM templates and scans for security misconfigurations.
+  infra:
+    name: Infra checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      # Pinned: cfn-lint 1.54.0 regressed on resolving !Ref inside SAM Globals and
+      # reports a false E3724 for `Architectures: [!Ref LambdaArchitecture]`, which
+      # is valid CloudFormation. 1.53.3 is the last clean release. Unpinning is what
+      # let this break CI silently on 2026-08-13 — re-test before raising the pin.
+      - name: Install cfn-lint
+        run: pip install 'cfn-lint==1.53.3'
+
+      - name: Lint CloudFormation templates
+        run: cfn-lint infra/template.yaml infra/foundation.yaml
+
+      # Scans SAM/CloudFormation templates for security misconfigurations
+      # (open API routes, overly permissive IAM policies, missing encryption, etc.)
+      # soft_fail keeps this non-blocking so you can review findings before enforcing.
+      - name: Checkov IaC security scan
+        uses: bridgecrewio/checkov-action@dfb51aed1b783289b0d3f255028e7a88d5e8caa1 # v12
+        with:
+          directory: infra/
+          framework: cloudformation
+          quiet: true
+          soft_fail: true

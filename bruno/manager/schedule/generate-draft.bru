@@ -1,0 +1,49 @@
+meta {
+  name: Generate Draft Schedule
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/manager/schedule/generate?month=2026-07
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{manager_token}}
+}
+
+docs {
+  Triggers the draft-generation algorithm for the calling manager for the given month.
+  Creates draft shift records for fillable slots and draft_failed sentinel records for
+  slots where no eligible employee could be found. Re-runs are idempotent for sentinels
+  (PutItem overwrites the same deterministic SK).
+
+  Query param: month=YYYY-MM (defaults to current month if omitted)
+
+  Response 200:
+  {
+    "created": 12,
+    "unfilled": 2,
+    "draftFailed": 2,
+    "draftCount": 3,
+    "maxDrafts": 10
+  }
+
+  Fields:
+    created      — number of new draft shifts written (filled slots)
+    unfilled     — total slots that could not be filled (= draftFailed)
+    draftFailed  — number of draft_failed sentinel records written
+    draftCount   — updated total number of draft generations for this manager/month
+    maxDrafts    — maximum allowed draft generations per month (10)
+
+  Response 400 (month format invalid):
+  { "error": "month must be in YYYY-MM format" }
+
+  Response 400 (draft limit reached):
+  { "error": "Maximum of 10 draft generations per month reached for 2026-07" }
+
+  Response 403 (caller not provisioned as manager):
+  { "error": "Caller organization could not be resolved" }
+}

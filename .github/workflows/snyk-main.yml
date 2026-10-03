@@ -1,0 +1,221 @@
+# Full-depth Snyk scan + continuous monitoring snapshot, run on every push to `main`
+# — same trigger as ci.yml and sonarcloud.yml, so all three land on the same commit
+# and surface together in the Security tab / SonarCloud dashboard / Snyk dashboard.
+#
+# NOTE: Lands in report-only mode (`|| true`) per the rollout plan — see
+# docs/snyk-implementation-plan.md Section 9. This workflow's job is to populate
+# the Snyk dashboard with `monitor` snapshots and surface findings, not to fail a
+# build whose code is already merged.
+name: Snyk — Main Branch
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ── Full-depth scan + monitor: frontend ──
+  frontend-snyk:
+    name: Snyk full scan — frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      # Broader net than the PR gate (medium vs. high) — this is the audit-of-record
+      # pass; a failure here means "investigate and triage," not "the merge is blocked"
+      # (the code is already on main). See plan Section 5 for full reasoning.
+      - name: Snyk Open Source — full dependency graph
+        working-directory: frontend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk test \
+            --severity-threshold=medium \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-oss.sarif || true
+
+      - name: Snyk Code — full SAST
+        working-directory: frontend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk code test \
+            --severity-threshold=medium \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-code.sarif || true
+
+      # `monitor` (not `test`) is what creates the persistent, continuously-re-evaluated
+      # snapshot in the Snyk dashboard — closes the "CVE disclosed after merge" gap that
+      # a point-in-time `test` alone cannot (plan Section 2.3, gap 3).
+      - name: Snyk monitor — continuous tracking
+        working-directory: frontend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk monitor \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --project-name="daltime-frontend"
+
+      # The hashFiles guard matters: a scan step can soft-fail (`|| true`) without
+      # producing a SARIF file at all — e.g. Snyk Code returns 403 if it isn't
+      # enabled for the org (SNYK-CODE-0005), and the CLI writes nothing in that
+      # case. Without this guard, `upload-sarif` hard-fails on a missing file even
+      # though the scan step itself "succeeded." Verified live: this is exactly
+      # what happened on the first run before Snyk Code was activated org-wide.
+      - name: Upload Open Source SARIF
+        if: always() && hashFiles('frontend/snyk-oss.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: frontend/snyk-oss.sarif
+          category: snyk-oss-frontend-main
+
+      - name: Upload Code SARIF
+        if: always() && hashFiles('frontend/snyk-code.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: frontend/snyk-code.sarif
+          category: snyk-code-frontend-main
+
+  # ── Full-depth scan + monitor: backend ──
+  backend-snyk:
+    name: Snyk full scan — backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # @daltime/contracts is a file:vendor/contracts dependency; the vendored copy
+      # must exist before `npm ci` in backend/ (see backend/scripts/sync-contracts.mjs).
+      - name: Install contract dependencies
+        run: npm ci
+        working-directory: contracts
+
+      - name: Build and vendor contracts into the backend
+        run: node scripts/sync-contracts.mjs
+        working-directory: backend
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Snyk Open Source — full dependency graph
+        working-directory: backend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk test \
+            --severity-threshold=medium \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-oss.sarif || true
+
+      - name: Snyk Code — full SAST
+        working-directory: backend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk code test \
+            --severity-threshold=medium \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-code.sarif || true
+
+      - name: Snyk monitor — continuous tracking
+        working-directory: backend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk monitor \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --project-name="daltime-backend"
+
+      - name: Upload Open Source SARIF
+        if: always() && hashFiles('backend/snyk-oss.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: backend/snyk-oss.sarif
+          category: snyk-oss-backend-main
+
+      - name: Upload Code SARIF
+        if: always() && hashFiles('backend/snyk-code.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: backend/snyk-code.sarif
+          category: snyk-code-backend-main
+
+  # ── Full IaC scan + monitor (both templates) ──
+  infra-snyk:
+    name: Snyk full IaC scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Snyk IaC — full scan
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk iac test infra/template.yaml infra/foundation.yaml \
+            --severity-threshold=medium \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-iac.sarif || true
+
+      - name: Snyk IaC — monitor
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk iac monitor infra/template.yaml infra/foundation.yaml \
+            --org=${{ vars.SNYK_ORG_ID }} || true
+
+      - name: Upload IaC SARIF
+        if: always() && hashFiles('snyk-iac.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk-iac.sarif
+          category: snyk-iac-main
+
+  # NOTE: No container job. Verified — no Dockerfile, no image build/push step exists
+  # anywhere in this repo (plan Section 3.3). Add a `snyk container test && snyk
+  # container monitor` job here if/when infra/template.yaml ever defines a function
+  # with `PackageType: Image`.

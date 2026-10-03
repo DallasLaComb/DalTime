@@ -1,0 +1,250 @@
+# Fast, scoped Snyk feedback on pull requests targeting the long-lived branches.
+# This is the FIRST pre-merge check of any kind in this repo (verified: no existing
+# workflow triggers on pull_request, and `main` has no branch protection). Pair this
+# with the branch-protection recommendation in docs/snyk-implementation-plan.md so
+# these checks are enforced rather than advisory-only.
+#
+# NOTE: Lands in report-only mode per the rollout plan (Section 9) — every Snyk
+# step below uses `|| true` so nothing blocks merges until the existing baseline is
+# triaged. Remove `|| true` and wire into branch protection in Phase 2.
+name: Snyk — Pull Request
+
+on:
+  pull_request:
+    branches: [dev, qa, main]
+    # Path filters keep a frontend-only change from waiting on a backend scan and
+    # vice versa — directly serves "minimize developer friction."
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'infra/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/snyk-*.yml'
+
+# Cancel superseded runs on the same PR — same pattern as cd.yml's concurrency group,
+# applied here so force-pushes during review don't queue redundant scans.
+concurrency:
+  group: snyk-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # checkout only
+  security-events: write # required to upload SARIF to the code-scanning API
+  pull-requests: write # required for Snyk's inline PR annotations/comments
+
+jobs:
+  # ── Detect which projects changed, so unaffected projects are skipped entirely ──
+  changes:
+    name: Detect changed projects
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: Path filter
+        id: filter
+        uses: dorny/paths-filter@6852f92c20ea7fd3b0c25de3b5112db3a98da050 # v3
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - 'package-lock.json'
+            backend:
+              - 'backend/**'
+              - 'contracts/**'
+              - 'package-lock.json'
+            infra:
+              - 'infra/**'
+
+  # ── Snyk Open Source + Snyk Code: frontend ──
+  frontend-snyk:
+    name: Snyk scan — frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      # Open Source: full transitive dependency graph + license policy.
+      # --severity-threshold=high is the target gate once Phase 2 flips this to
+      # blocking — see docs/snyk-implementation-plan.md Section 5 for reasoning.
+      - name: Snyk Open Source (SCA)
+        working-directory: frontend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk test \
+            --severity-threshold=high \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-oss.sarif || true
+
+      # Code: PR-time SAST. Coexists with (does not replace) the post-merge CodeQL
+      # scan already in ci.yml — see plan Section 3.2 for the division-of-labor reasoning.
+      - name: Snyk Code (SAST)
+        working-directory: frontend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-code.sarif || true
+
+      # Always upload SARIF, even if the scan step above reported findings — partial
+      # results are still actionable, and this is what powers inline PR annotations
+      # via the Security tab integration (security-events: write, granted above).
+      #
+      # The hashFiles guard matters separately: a soft-failed scan (`|| true`) can
+      # produce no SARIF file at all — e.g. Snyk Code returns 403 if it isn't
+      # enabled for the org (SNYK-CODE-0005), and writes nothing in that case.
+      # Without this guard, `upload-sarif` hard-fails on a missing file even though
+      # the scan step itself "succeeded." Verified live on the first run of
+      # snyk-main.yml before Snyk Code was activated org-wide.
+      - name: Upload Open Source SARIF
+        if: always() && hashFiles('frontend/snyk-oss.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: frontend/snyk-oss.sarif
+          category: snyk-oss-frontend
+
+      - name: Upload Code SARIF
+        if: always() && hashFiles('frontend/snyk-code.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: frontend/snyk-code.sarif
+          category: snyk-code-frontend
+
+  # ── Snyk Open Source + Snyk Code: backend ──
+  backend-snyk:
+    name: Snyk scan — backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # @daltime/contracts is a file:vendor/contracts dependency; the vendored copy
+      # must exist before `npm ci` in backend/ (see backend/scripts/sync-contracts.mjs).
+      - name: Install contract dependencies
+        run: npm ci
+        working-directory: contracts
+
+      - name: Build and vendor contracts into the backend
+        run: node scripts/sync-contracts.mjs
+        working-directory: backend
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Snyk Open Source (SCA)
+        working-directory: backend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk test \
+            --severity-threshold=high \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-oss.sarif || true
+
+      - name: Snyk Code (SAST)
+        working-directory: backend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-code.sarif || true
+
+      - name: Upload Open Source SARIF
+        if: always() && hashFiles('backend/snyk-oss.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: backend/snyk-oss.sarif
+          category: snyk-oss-backend
+
+      - name: Upload Code SARIF
+        if: always() && hashFiles('backend/snyk-code.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: backend/snyk-code.sarif
+          category: snyk-code-backend
+
+  # ── Snyk IaC: only when infra/ changes ──
+  # Runs alongside (not instead of) the existing Checkov scan in ci.yml — see plan
+  # Section 3.4 for why this stays in report mode rather than gating: Checkov already
+  # has a deliberately-tuned skip_check list with inline reasoning, and a second
+  # blocking IaC tool with a different default ruleset would reintroduce exactly the
+  # noise the team already tuned Checkov to avoid.
+  infra-snyk:
+    name: Snyk IaC scan
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Snyk IaC scan (report-only)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk iac test infra/template.yaml infra/foundation.yaml \
+            --org=${{ vars.SNYK_ORG_ID }} \
+            --sarif-file-output=snyk-iac.sarif || true
+
+      - name: Upload IaC SARIF
+        if: always() && hashFiles('snyk-iac.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk-iac.sarif
+          category: snyk-iac

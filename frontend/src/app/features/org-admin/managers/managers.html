@@ -1,0 +1,169 @@
+<app-crud-page
+  title="Managers"
+  actionLabel="+ Register Manager"
+  [loading]="loading()"
+  [error]="error()"
+  [empty]="managers().length === 0"
+  emptyTitle="No managers registered yet"
+  emptyDescription="Register a manager to get started with scheduling."
+  (action)="openRegisterModal()"
+  (retry)="load()"
+>
+  <app-status-filter
+    [value]="statusFilter()"
+    [counts]="statusCounts()"
+    noun="managers"
+    (changed)="setStatusFilter($event)"
+  />
+
+  @if (filteredEntities().length === 0) {
+    <app-empty-state
+      [title]="nothingMatchingText()"
+      description="Try another status."
+      data-testid="status-filter-empty"
+    />
+  } @else {
+    <app-card-list [data]="filteredEntities()" [trackBy]="trackById" [cardTemplate]="managerCard" />
+
+    <ng-template #managerCard let-manager>
+      <div class="flex justify-between items-start mb-1">
+        <h6 class="text-base font-semibold text-gray-900 mb-0" data-testid="manager-name">
+          {{ manager.first_name }} {{ manager.last_name }}
+        </h6>
+        <app-status-badge
+          [status]="manager.status"
+          [label]="statusLabel(manager.status)"
+          [colorMap]="statusColorMap"
+        />
+      </div>
+      <p class="text-sm text-gray-500 mb-1" data-testid="manager-email">{{ manager.email }}</p>
+      @if (manager.phone) {
+        <p class="text-sm text-gray-500 mb-1" data-testid="manager-phone">
+          <app-phone-display [phone]="manager.phone" />
+        </p>
+      }
+      <div class="flex justify-between items-center mb-3">
+        <small class="text-gray-400">{{ manager.created_at | date: 'mediumDate' }}</small>
+        <small class="text-gray-400" data-testid="employee-count">{{
+          manager.employee_count | plural: 'employee'
+        }}</small>
+      </div>
+      <app-employee-actions
+        [status]="manager.status"
+        layout="card"
+        (editRequested)="openEditModal(manager)"
+        (disableRequested)="openDisableModal(manager)"
+        (enableRequested)="openEnableModal(manager)"
+      >
+        <app-button
+          class="flex-1"
+          variant="secondary"
+          size="sm"
+          testId="locations-btn"
+          (clicked)="openLocationsModal(manager)"
+          >Locations</app-button
+        >
+      </app-employee-actions>
+    </ng-template>
+
+    <app-data-table [columns]="columns" [data]="filteredEntities()" [trackBy]="trackById">
+      @for (manager of filteredEntities(); track manager.manager_id) {
+        <tr class="hover:bg-gray-50" data-testid="manager-row">
+          <td class="px-4 py-3 font-semibold text-gray-900" data-testid="manager-name">
+            {{ manager.first_name }} {{ manager.last_name }}
+          </td>
+          <td class="px-4 py-3 text-gray-700" data-testid="manager-email">{{ manager.email }}</td>
+          <td class="px-4 py-3 text-gray-700" data-testid="manager-phone">
+            <app-phone-display [phone]="manager.phone" />
+          </td>
+          <td class="px-4 py-3">
+            <app-status-badge
+              [status]="manager.status"
+              [label]="statusLabel(manager.status)"
+              [colorMap]="statusColorMap"
+            />
+          </td>
+          <td class="px-4 py-3 text-gray-700" data-testid="employee-count">
+            {{ manager.employee_count }}
+          </td>
+          <td class="px-4 py-3">
+            <app-button
+              variant="secondary"
+              size="sm"
+              testId="locations-btn"
+              (clicked)="openLocationsModal(manager)"
+              >Locations</app-button
+            >
+          </td>
+          <td class="px-4 py-3 text-gray-500">{{ manager.created_at | date: 'mediumDate' }}</td>
+          <td class="px-4 py-3 text-right">
+            <app-employee-actions
+              [status]="manager.status"
+              layout="table"
+              (editRequested)="openEditModal(manager)"
+              (disableRequested)="openDisableModal(manager)"
+              (enableRequested)="openEnableModal(manager)"
+            />
+          </td>
+        </tr>
+      }
+    </app-data-table>
+  }
+
+  <ng-container slot="modals">
+    <app-register-employee-modal
+      [open]="showRegisterModal()"
+      [saving]="saving()"
+      [error]="modalError()"
+      entityLabel="Manager"
+      (cancelled)="closeRegisterModal()"
+      (registered)="handleRegister($event)"
+    />
+
+    <app-edit-employee-modal
+      [open]="showEditModal()"
+      [saving]="saving()"
+      [error]="editError()"
+      entityLabel="Manager"
+      [initial]="editingManager()"
+      (cancelled)="closeEditModal()"
+      (saved)="handleSaveEdit($event)"
+    />
+
+    <app-employee-status-modals
+      entityLabel="Manager"
+      testIdPrefix="manager"
+      [showDisableModal]="showDisableModal()"
+      [showEnableModal]="showEnableModal()"
+      [disablingEmployee]="disablingEntity()"
+      [enablingEmployee]="enablingEntity()"
+      [saving]="saving()"
+      [disableError]="disableError()"
+      [disableNeedsAcknowledgement]="disableNeedsAcknowledgement()"
+      [enableError]="enableError()"
+      [disableBlockedReason]="disableBlockedReason()"
+      [disableBlockedLink]="reassignLink"
+      (disableConfirmed)="confirmDisable()"
+      (disableCancelled)="closeDisableModal()"
+      (enableConfirmed)="confirmEnable()"
+      (enableCancelled)="closeEnableModal()"
+    />
+
+    <app-locations-modal
+      [open]="showLocationsModal()"
+      [entityName]="
+        (locationsManager()?.first_name ?? '') + ' ' + (locationsManager()?.last_name ?? '')
+      "
+      [assignedLocations]="assignedLocations()"
+      [availableLocations]="availableLocations()"
+      [loading]="locationsLoading()"
+      [error]="locationsError()"
+      [assigning]="assigning()"
+      [assignError]="assignError()"
+      [removing]="removing()"
+      (closed)="closeLocationsModal()"
+      (assignRequested)="handleAssignRequested($event)"
+      (removeConfirmed)="handleRemoveConfirmed($event)"
+    />
+  </ng-container>
+</app-crud-page>

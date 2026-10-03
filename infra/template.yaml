@@ -1,0 +1,3167 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: DalTime Scheduling Application Backend
+
+Parameters:
+  AllowedOrigins:
+    Type: CommaDelimitedList
+    Default: 'http://localhost:4200,https://localhost'
+    Description: 'Comma-separated frontend origins for CORS (https://localhost is the Capacitor mobile WebView origin)'
+  CognitoUserPoolId:
+    Type: String
+    Default: 'us-east-1_LVp3uUQ5l'
+  CognitoClientId:
+    Type: String
+    Default: '1vvrr1dvepebrkl1v246pbijju'
+  LambdaArchitecture:
+    Type: String
+    Default: arm64
+    AllowedValues:
+      - arm64
+      - x86_64
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653]
+    Description: 'CloudWatch log retention in days (dev 14, qa 14, prod 90)'
+  LogLevel:
+    Type: String
+    Default: INFO
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARN
+      - ERROR
+    Description: 'Lambda ApplicationLogLevel and POWERTOOLS_LOG_LEVEL (dev DEBUG, qa/prod INFO)'
+  AppEnvironment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - prod
+    Description: 'Deployment environment name surfaced as ENVIRONMENT in Lambda env vars'
+  AlertEmail:
+    Type: String
+    Default: ''
+    Description: 'Email address for the ERROR-rate CloudWatch alarm (SNS subscription). Empty disables the subscription only — the SNS topic and alarm deploy either way, so a missing value never breaks a deploy.'
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs24.x
+    Architectures:
+      - !Ref LambdaArchitecture
+    Environment:
+      Variables:
+        NODE_ENV: development
+        ALLOWED_ORIGINS: !Join [',', !Ref AllowedOrigins]
+        TABLE_NAME: !Ref DalTimeTable
+        POWERTOOLS_SERVICE_NAME: daltime-backend
+        POWERTOOLS_LOG_LEVEL: !Ref LogLevel
+        ENVIRONMENT: !Ref AppEnvironment
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+
+Resources:
+  # Access log group for the HTTP API (API Gateway V2).
+  # API Gateway V2 does not use the account-level CloudWatch role (that's V1 only).
+  # Instead, we grant the delivery.logs service principal write access via a
+  # resource-based policy directly on the log group.
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/apigateway/${AWS::StackName}/access-logs'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ApiAccessLogGroupPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-apigw-access-log-policy'
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowApiGatewayV2Logging",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "delivery.logs.amazonaws.com"
+              },
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": "${ApiAccessLogGroup.Arn}:*",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": "${AWS::AccountId}"
+                }
+              }
+            }
+          ]
+        }
+
+  OrgAdminsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  EmployeesFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-EmployeesFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ProfileFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ProfileFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagersFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagersFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagerProfileFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagerProfileFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagerProfileFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagerProfileFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagerProfileFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagerProfileFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/manager/profile/handler.handler
+      Events:
+        GetManagerProfile:
+          Type: HttpApi
+          Properties:
+            Path: /manager/profile
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        UpdateManagerProfile:
+          Type: HttpApi
+          Properties:
+            Path: /manager/profile
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerProfile:
+          Type: HttpApi
+          Properties:
+            Path: /manager/profile
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminGetUser
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/manager/profile/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagerLocationsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagerLocationsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagerLocationsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagerLocationsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagerLocationsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagerLocationsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/manager/locations/handler.handler
+      Events:
+        ListManagerLocations:
+          Type: HttpApi
+          Properties:
+            Path: /manager/locations
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerLocations:
+          Type: HttpApi
+          Properties:
+            Path: /manager/locations
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/manager/locations/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagerShiftsNeededFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagerShiftsNeededFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagerShiftsNeededFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagerShiftsNeededFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagerShiftsNeededFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagerShiftsNeededFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/manager/shifts-needed/handler.handler
+      Events:
+        ListManagerShiftsNeeded:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts-needed
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateManagerShiftNeeded:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts-needed
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        UpdateManagerShiftNeeded:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts-needed/{shiftId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DeleteManagerShiftNeeded:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts-needed/{shiftId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerShiftsNeeded:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts-needed
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerShiftNeededById:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts-needed/{shiftId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/manager/shifts-needed/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagerScheduleTemplatesFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagerScheduleTemplatesFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagerScheduleTemplatesFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagerScheduleTemplatesFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagerScheduleTemplatesFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagerScheduleTemplatesFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/manager/schedule-templates/handler.handler
+      Events:
+        ListManagerScheduleTemplates:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule-templates
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateManagerScheduleTemplate:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule-templates
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        UpdateManagerScheduleTemplate:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule-templates/{templateId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DeleteManagerScheduleTemplate:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule-templates/{templateId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        ApplyManagerScheduleTemplate:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule-templates/{templateId}/apply
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerScheduleTemplates:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule-templates
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerScheduleTemplateById:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule-templates/{templateId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerScheduleTemplateApply:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule-templates/{templateId}/apply
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/manager/schedule-templates/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagerShiftsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagerShiftsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagerShiftsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagerShiftsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagerShiftsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagerShiftsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/manager/shifts/handler.handler
+      Events:
+        ListManagerShifts:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateManagerShift:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        UpdateManagerShift:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts/{shiftId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DeleteManagerShift:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts/{shiftId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerShifts:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerShiftById:
+          Type: HttpApi
+          Properties:
+            Path: /manager/shifts/{shiftId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/manager/shifts/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagerScheduleFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagerScheduleFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagerScheduleFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagerScheduleFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagerScheduleFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagerScheduleFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/manager/schedule/handler.handler
+      Events:
+        GenerateDraftSchedule:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule/generate
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        PublishSchedule:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule/publish
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        GetDraftSummary:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule/drafts
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        GetScheduleMeta:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule/meta
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerSchedule:
+          Type: HttpApi
+          Properties:
+            Path: /manager/schedule/{proxy+}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/manager/schedule/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagerEmployeesFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagerEmployeesFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  OrganizationsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-OrganizationsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  WebAdminEmployeesFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-WebAdminEmployeesFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  WebAdminProfileFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-WebAdminProfileFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  WebAdminGenerateDummyDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-WebAdminGenerateDummyDataFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  DalTimeHttpApi:
+    Type: AWS::Serverless::HttpApi
+    DependsOn: ApiAccessLogGroupPolicy
+    Properties:
+      StageName: $default
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: >-
+          {"requestId":"$context.requestId","ip":"$context.identity.sourceIp",
+          "method":"$context.httpMethod","path":"$context.path",
+          "status":"$context.status","protocol":"$context.protocol",
+          "responseLength":"$context.responseLength",
+          "integrationError":"$context.integrationErrorMessage",
+          "error":"$context.error.message",
+          "integrationStatus":"$context.integration.integrationStatus","responseLatency":"$context.responseLatency","callerSub":"$context.authorizer.claims.sub"}
+      Auth:
+        DefaultAuthorizer: CognitoJwtAuthorizer
+        Authorizers:
+          CognitoJwtAuthorizer:
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolId}'
+              audience:
+                - !Ref CognitoClientId
+            IdentitySource: '$request.header.Authorization'
+      CorsConfiguration:
+        AllowOrigins: !Ref AllowedOrigins
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Impersonate-User
+          - X-View-As
+          - X-Correlation-Id
+          - X-Platform
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        MaxAge: 300
+      RouteSettings:
+        'POST /shared/client-logs':
+          ThrottlingBurstLimit: 10
+          ThrottlingRateLimit: 10
+
+  DalTimeTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'daltime-${AWS::StackName}'
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      # Numeric `ttl` (epoch seconds) on broadcasts, broadcast dismissals and impersonation
+      # sessions. See docs/dynamodb-best-practices.md R7.
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  OrgAdminsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrgAdminsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-OrgAdminsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/web-admin/org-admins/handler.handler
+      Events:
+        ListOrgAdmins:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateOrgAdmin:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        DisableOrgAdmin:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins/{userId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        EnableOrgAdmin:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins/{userId}
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdmins:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsOrgAdminById:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/organizations/{orgId}/org-admins/{userId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminDisableUser
+                - cognito-idp:AdminEnableUser
+                - cognito-idp:AdminGetUser
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/org-admins/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagersFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagersFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagersFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagersFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/managers/handler.handler
+      Events:
+        ListManagers:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateManager:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        UpdateManager:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DisableManager:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        EnableManager:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagers:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerById:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminDisableUser
+                - cognito-idp:AdminEnableUser
+                - cognito-idp:AdminGetUser
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/managers/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  OrgAdminLocationsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminLocationsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  OrgAdminLocationsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrgAdminLocationsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-OrgAdminLocationsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminLocationsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/locations/handler.handler
+      Events:
+        ListOrgAdminLocations:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/locations
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateOrgAdminLocation:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/locations
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        UpdateOrgAdminLocation:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/locations/{locationId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DeleteOrgAdminLocation:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/locations/{locationId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdminLocations:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/locations
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsOrgAdminLocationById:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/locations/{locationId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/locations/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  OrganizationsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrganizationsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-OrganizationsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-OrganizationsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/web-admin/organizations/handler.handler
+      Events:
+        ListOrganizations:
+          Type: HttpApi
+          Properties:
+            Path: /organizations
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /organizations
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        GetOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /organizations/{orgId}
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        UpdateOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /organizations/{orgId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DeleteOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /organizations/{orgId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrganizations:
+          Type: HttpApi
+          Properties:
+            Path: /organizations
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsOrganizationById:
+          Type: HttpApi
+          Properties:
+            Path: /organizations/{orgId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/organizations/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  EmployeesFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EmployeesFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-EmployeesFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-EmployeesFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/employees/handler.handler
+      Events:
+        ListEmployees:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateEmployee:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        UpdateEmployee:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DisableEmployee:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        EnableEmployee:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployees:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsEmployeeById:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminDisableUser
+                - cognito-idp:AdminEnableUser
+                - cognito-idp:AdminGetUser
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/employees/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagerEmployeesFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagerEmployeesFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagerEmployeesFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagerEmployeesFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/manager/employees/handler.handler
+      Events:
+        ListManagerEmployees:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        CreateManagerEmployee:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        UpdateManagerEmployee:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees/{employeeId}
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        DisableManagerEmployee:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees/{employeeId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        EnableManagerEmployee:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees/{employeeId}
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerEmployees:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerEmployeeById:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees/{employeeId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        GetManagerEmployeeAvailability:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees/{employeeId}/availability
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        GetManagerEmployeeAvailabilityOverrides:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees/{employeeId}/availability/overrides
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerEmployeeAvailability:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees/{employeeId}/availability
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerEmployeeAvailabilityOverrides:
+          Type: HttpApi
+          Properties:
+            Path: /manager/employees/{employeeId}/availability/overrides
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminDisableUser
+                - cognito-idp:AdminEnableUser
+                - cognito-idp:AdminGetUser
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/manager/employees/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ProfileFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ProfileFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ProfileFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ProfileFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/profile/handler.handler
+      Events:
+        GetProfile:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/profile
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        UpdateProfile:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/profile
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsProfile:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/profile
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminGetUser
+                - cognito-idp:AdminUpdateUserAttributes
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/profile/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  OrgAdminOrganizationFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminOrganizationFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  OrgAdminOrganizationFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrgAdminOrganizationFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-OrgAdminOrganizationFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminOrganizationFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/organization/handler.handler
+      Events:
+        GetOrgAdminOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/organization
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        UpdateOrgAdminOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/organization
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdminOrganization:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/organization
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/organization/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ImpersonateFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ImpersonateFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  # The impersonation PICKER only (list users, describe one). Acting as a user is done by each
+  # role Lambda itself via the X-Impersonate-User header (shared/impersonation.ts).
+  ImpersonateFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ImpersonateFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ImpersonateFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ImpersonateFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/web-admin/impersonate/handler.handler
+      Events:
+        ListImpersonateUsers:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/users
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        GetImpersonateContext:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/{userId}/context
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsImpersonateRoot:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsImpersonateById:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/{userId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsImpersonateUsers:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/users
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsImpersonateContext:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/{userId}/context
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        StartImpersonateSession:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/sessions
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        EndImpersonateSession:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/sessions/{sessionId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsImpersonateSessions:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/sessions
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsImpersonateSessionById:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/impersonate/sessions/{sessionId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminGetUser
+                - cognito-idp:AdminListGroupsForUser
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/impersonate/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  WebAdminEmployeesFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: WebAdminEmployeesFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-WebAdminEmployeesFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-WebAdminEmployeesFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/web-admin/employees/handler.handler
+      Events:
+        ListWebAdminEmployees:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/employees
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsWebAdminEmployees:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/employees
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/employees/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  WebAdminProfileFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: WebAdminProfileFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-WebAdminProfileFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-WebAdminProfileFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/web-admin/profile/handler.handler
+      Events:
+        GetWebAdminProfile:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/profile
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        UpdateWebAdminProfile:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/profile
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsWebAdminProfile:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/profile
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminGetUser
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/profile/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  WebAdminGenerateDummyDataFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: WebAdminGenerateDummyDataFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-WebAdminGenerateDummyDataFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-WebAdminGenerateDummyDataFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/web-admin/generate-dummy-data/handler.handler
+      Events:
+        PostWebAdminGenerateDummyData:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/generate-dummy-data
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        OptionsWebAdminGenerateDummyData:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/generate-dummy-data
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/generate-dummy-data/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ManagerLocationsAssignFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ManagerLocationsAssignFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ManagerLocationsAssignFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ManagerLocationsAssignFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ManagerLocationsAssignFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ManagerLocationsAssignFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/manager-locations/handler.handler
+      Events:
+        ListManagerLocationAssignments:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}/locations
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        AssignManagerLocation:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}/locations
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        RemoveManagerLocation:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}/locations/{locationId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerLocationAssignments:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}/locations
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerLocationAssignmentById:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/managers/{managerId}/locations/{locationId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/manager-locations/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  EmployeeLocationsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-EmployeeLocationsAssignFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  EmployeeLocationsAssignFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EmployeeLocationsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-EmployeeLocationsAssignFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-EmployeeLocationsAssignFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/employee-locations/handler.handler
+      Events:
+        ListEmployeeLocationAssignments:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}/locations
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        AssignEmployeeLocation:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}/locations
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        RemoveEmployeeLocation:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}/locations/{locationId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeLocationAssignments:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}/locations
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsEmployeeLocationAssignmentById:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/employees/{employeeId}/locations/{locationId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/employee-locations/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  EmployeeProfileFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-EmployeeProfileFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  EmployeeProfileFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EmployeeProfileFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-EmployeeProfileFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-EmployeeProfileFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/employee/profile/handler.handler
+      Events:
+        GetEmployeeProfile:
+          Type: HttpApi
+          Properties:
+            Path: /employee/profile
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        UpdateEmployeeProfile:
+          Type: HttpApi
+          Properties:
+            Path: /employee/profile
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeProfile:
+          Type: HttpApi
+          Properties:
+            Path: /employee/profile
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminGetUser
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/employee/profile/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  EmployeeAvailabilityFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-EmployeeAvailabilityFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  EmployeeAvailabilityFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EmployeeAvailabilityFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-EmployeeAvailabilityFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-EmployeeAvailabilityFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/employee/availability/handler.handler
+      Events:
+        GetEmployeeAvailability:
+          Type: HttpApi
+          Properties:
+            Path: /employee/availability
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        UpdateEmployeeAvailability:
+          Type: HttpApi
+          Properties:
+            Path: /employee/availability
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeAvailability:
+          Type: HttpApi
+          Properties:
+            Path: /employee/availability
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/employee/availability/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  EmployeeAvailabilityOverridesFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-EmployeeAvailabilityOverridesFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  EmployeeAvailabilityOverridesFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EmployeeAvailabilityOverridesFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-EmployeeAvailabilityOverridesFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-EmployeeAvailabilityOverridesFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/employee/availability-overrides/handler.handler
+      Events:
+        GetEmployeeAvailabilityOverrides:
+          Type: HttpApi
+          Properties:
+            Path: /employee/availability/overrides
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        UpdateEmployeeAvailabilityOverrides:
+          Type: HttpApi
+          Properties:
+            Path: /employee/availability/overrides
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeAvailabilityOverrides:
+          Type: HttpApi
+          Properties:
+            Path: /employee/availability/overrides
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/employee/availability-overrides/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  OrgAdminShiftsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminShiftsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  OrgAdminShiftsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrgAdminShiftsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-OrgAdminShiftsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminShiftsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/shifts/handler.handler
+      Events:
+        ListOrgAdminShifts:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/shifts
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdminShifts:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/shifts
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/shifts/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  OrgAdminShiftsNeededFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminShiftsNeededFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  OrgAdminShiftsNeededFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrgAdminShiftsNeededFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-OrgAdminShiftsNeededFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminShiftsNeededFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/shifts-needed/handler.handler
+      Events:
+        ListOrgAdminShiftsNeeded:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/shifts-needed
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdminShiftsNeeded:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/shifts-needed
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/shifts-needed/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  OrgAdminOverviewFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminOverviewFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  OrgAdminOverviewFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: OrgAdminOverviewFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-OrgAdminOverviewFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-OrgAdminOverviewFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/org-admin/overview/handler.handler
+      Events:
+        GetOrgAdminOverview:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/overview
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdminOverview:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/overview
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref CognitoUserPoolId
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:ListUsers
+              Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/org-admin/overview/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  EmployeeShiftsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-EmployeeShiftsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  EmployeeShiftsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EmployeeShiftsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-EmployeeShiftsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-EmployeeShiftsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/employee/shifts/handler.handler
+      Events:
+        ListEmployeeShifts:
+          Type: HttpApi
+          Properties:
+            Path: /employee/shifts
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeShifts:
+          Type: HttpApi
+          Properties:
+            Path: /employee/shifts
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/employee/shifts/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  EmployeeAvailableShiftsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-EmployeeAvailableShiftsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  EmployeeAvailableShiftsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EmployeeAvailableShiftsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-EmployeeAvailableShiftsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-EmployeeAvailableShiftsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/employee/available-shifts/handler.handler
+      Events:
+        ListEmployeeAvailableShifts:
+          Type: HttpApi
+          Properties:
+            Path: /employee/available-shifts
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeAvailableShifts:
+          Type: HttpApi
+          Properties:
+            Path: /employee/available-shifts
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/employee/available-shifts/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  NotificationsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-NotificationsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  NotificationsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: NotificationsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-NotificationsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-NotificationsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/shared/notifications/handler.handler
+      Events:
+        ListWebAdminNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/notifications
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        MarkAllWebAdminNotificationsRead:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/notifications
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        MarkOneWebAdminNotificationRead:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/notifications/{notificationId}
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        OptionsWebAdminNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/notifications
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsWebAdminNotificationById:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/notifications/{notificationId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        ListOrgAdminNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/notifications
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        MarkAllOrgAdminNotificationsRead:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/notifications
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        MarkOneOrgAdminNotificationRead:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/notifications/{notificationId}
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdminNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/notifications
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsOrgAdminNotificationById:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/notifications/{notificationId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        ListManagerNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /manager/notifications
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        MarkAllManagerNotificationsRead:
+          Type: HttpApi
+          Properties:
+            Path: /manager/notifications
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        MarkOneManagerNotificationRead:
+          Type: HttpApi
+          Properties:
+            Path: /manager/notifications/{notificationId}
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /manager/notifications
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsManagerNotificationById:
+          Type: HttpApi
+          Properties:
+            Path: /manager/notifications/{notificationId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        ListEmployeeNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /employee/notifications
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        MarkAllEmployeeNotificationsRead:
+          Type: HttpApi
+          Properties:
+            Path: /employee/notifications
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        MarkOneEmployeeNotificationRead:
+          Type: HttpApi
+          Properties:
+            Path: /employee/notifications/{notificationId}
+            Method: PATCH
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /employee/notifications
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsEmployeeNotificationById:
+          Type: HttpApi
+          Properties:
+            Path: /employee/notifications/{notificationId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/shared/notifications/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  WebAdminBroadcastsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-WebAdminBroadcastsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  WebAdminBroadcastsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: WebAdminBroadcastsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-WebAdminBroadcastsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-WebAdminBroadcastsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/web-admin/broadcasts/handler.handler
+      Events:
+        CreateWebAdminBroadcast:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        ListWebAdminBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsWebAdminBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        DeleteWebAdminBroadcast:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts/{broadcastId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsWebAdminBroadcastById:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts/{broadcastId}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/web-admin/broadcasts/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  BroadcastsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-BroadcastsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  BroadcastsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: BroadcastsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-BroadcastsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-BroadcastsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/shared/broadcasts/handler.handler
+      Events:
+        ListActiveWebAdminBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts/active
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsActiveWebAdminBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts/active
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        DismissWebAdminBroadcast:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts/{broadcastId}/dismissal
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsWebAdminBroadcastDismissal:
+          Type: HttpApi
+          Properties:
+            Path: /web-admin/broadcasts/{broadcastId}/dismissal
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        ListActiveOrgAdminBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/broadcasts/active
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsActiveOrgAdminBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/broadcasts/active
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        DismissOrgAdminBroadcast:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/broadcasts/{broadcastId}/dismissal
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsOrgAdminBroadcastDismissal:
+          Type: HttpApi
+          Properties:
+            Path: /org-admin/broadcasts/{broadcastId}/dismissal
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        ListActiveManagerBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /manager/broadcasts/active
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsActiveManagerBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /manager/broadcasts/active
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        DismissManagerBroadcast:
+          Type: HttpApi
+          Properties:
+            Path: /manager/broadcasts/{broadcastId}/dismissal
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsManagerBroadcastDismissal:
+          Type: HttpApi
+          Properties:
+            Path: /manager/broadcasts/{broadcastId}/dismissal
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        ListActiveEmployeeBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /employee/broadcasts/active
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        OptionsActiveEmployeeBroadcasts:
+          Type: HttpApi
+          Properties:
+            Path: /employee/broadcasts/active
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        DismissEmployeeBroadcast:
+          Type: HttpApi
+          Properties:
+            Path: /employee/broadcasts/{broadcastId}/dismissal
+            Method: PUT
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeBroadcastDismissal:
+          Type: HttpApi
+          Properties:
+            Path: /employee/broadcasts/{broadcastId}/dismissal
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/shared/broadcasts/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  EmployeeSwapShiftsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-EmployeeSwapShiftsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  EmployeeSwapShiftsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: EmployeeSwapShiftsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-EmployeeSwapShiftsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-EmployeeSwapShiftsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/employee/swap-shifts/handler.handler
+      Events:
+        ListEmployeeSwapShifts:
+          Type: HttpApi
+          Properties:
+            Path: /employee/swap-shifts
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+        PostEmployeeSwapShift:
+          Type: HttpApi
+          Properties:
+            Path: /employee/swap-shifts
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        ClaimEmployeeSwapShift:
+          Type: HttpApi
+          Properties:
+            Path: /employee/swap-shifts/{swapId}/claim
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        DeleteEmployeeSwapShift:
+          Type: HttpApi
+          Properties:
+            Path: /employee/swap-shifts/{swapId}
+            Method: DELETE
+            ApiId: !Ref DalTimeHttpApi
+        OptionsEmployeeSwapShifts:
+          Type: HttpApi
+          Properties:
+            Path: /employee/swap-shifts
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsEmployeeSwapShiftsProxy:
+          Type: HttpApi
+          Properties:
+            Path: /employee/swap-shifts/{proxy+}
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/employee/swap-shifts/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  HealthFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-HealthFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: HealthFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-HealthFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-HealthFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/shared/health/handler.handler
+      Events:
+        GetHealth:
+          Type: HttpApi
+          Properties:
+            Path: /health
+            Method: GET
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+        OptionsHealth:
+          Type: HttpApi
+          Properties:
+            Path: /health
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/shared/health/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  ClientLogsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ClientLogsFunction'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ClientLogsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: ClientLogsFunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ClientLogsFunction'
+      LoggingConfig:
+        LogGroup: !Sub '/aws/lambda/${AWS::StackName}-ClientLogsFunction'
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref LogLevel
+        SystemLogLevel: WARN
+      CodeUri: ../backend
+      Handler: src/functions/shared/client-logs/handler.handler
+      Events:
+        PostClientLogs:
+          Type: HttpApi
+          Properties:
+            Path: /shared/client-logs
+            Method: POST
+            ApiId: !Ref DalTimeHttpApi
+        OptionsClientLogs:
+          Type: HttpApi
+          Properties:
+            Path: /shared/client-logs
+            Method: OPTIONS
+            ApiId: !Ref DalTimeHttpApi
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DalTimeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/functions/shared/client-logs/handler.ts
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: 'es2022'
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+
+  # --- Phase 10: observability payoff ---
+  # One metric filter per function log group, all emitting to the same un-dimensioned metric so a
+  # single alarm's Sum statistic aggregates ERROR-level lines across every function.
+  OrgAdminsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref OrgAdminsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  EmployeesFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmployeesFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ProfileFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ProfileFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagersFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagersFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagerProfileFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagerProfileFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagerLocationsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagerLocationsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagerShiftsNeededFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagerShiftsNeededFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagerScheduleTemplatesFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagerScheduleTemplatesFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagerShiftsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagerShiftsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagerScheduleFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagerScheduleFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagerEmployeesFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagerEmployeesFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  OrganizationsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref OrganizationsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  WebAdminEmployeesFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref WebAdminEmployeesFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  WebAdminProfileFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref WebAdminProfileFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  WebAdminGenerateDummyDataFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref WebAdminGenerateDummyDataFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  OrgAdminLocationsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref OrgAdminLocationsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  OrgAdminOrganizationFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref OrgAdminOrganizationFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  OrgAdminShiftsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref OrgAdminShiftsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  OrgAdminShiftsNeededFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref OrgAdminShiftsNeededFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  OrgAdminOverviewFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref OrgAdminOverviewFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ImpersonateFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ImpersonateFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ManagerLocationsAssignFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ManagerLocationsAssignFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  EmployeeLocationsAssignFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      # The existing LogGroup resource's logical ID drops "Assign" (a pre-existing template
+      # inconsistency, not introduced here) even though the Function resource itself is
+      # EmployeeLocationsAssignFunction.
+      LogGroupName: !Ref EmployeeLocationsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  EmployeeProfileFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmployeeProfileFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  EmployeeAvailabilityFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmployeeAvailabilityFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  EmployeeAvailabilityOverridesFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmployeeAvailabilityOverridesFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  EmployeeShiftsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmployeeShiftsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  NotificationsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref NotificationsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  WebAdminBroadcastsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref WebAdminBroadcastsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  BroadcastsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref BroadcastsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  EmployeeAvailableShiftsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmployeeAvailableShiftsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  EmployeeSwapShiftsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmployeeSwapShiftsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  HealthFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref HealthFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ClientLogsFunctionErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ClientLogsFunctionLogGroup
+      FilterPattern: '{ $.level = "ERROR" }'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: DalTime/Logging
+          MetricName: ErrorCount
+          DefaultValue: 0
+
+  ErrorAlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-error-alarm'
+
+  ErrorAlarmEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref ErrorAlarmTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  ErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-error-rate'
+      AlarmDescription: 'Fires when the backend logs an ERROR-level line (Sum across all Lambda functions, 5-minute window).'
+      Namespace: DalTime/Logging
+      MetricName: ErrorCount
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ErrorAlarmTopic
+
+  # Saved Logs Insights queries -- docs/logging.md section 7 (7.1-7.7; 7.8 is an ops procedure, not a
+  # query). ClickTrail/RageClicks were designed around a custom interaction-tracker that Phase 8b
+  # (decision D13) replaced with PostHog -- kept as valid saved queries, but expect little/no data
+  # until/unless the app starts emitting 'click'/'rage_click' client-log entries again.
+  ErrorsByRouteQueryDefinition:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: DalTime/Errors by route (last 24h)
+      QueryString: |
+        filter level = "ERROR"
+        | stats count(*) as errors by route, handler
+        | sort errors desc
+
+  SlowRequestsQueryDefinition:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: DalTime/Slow requests (over 500ms)
+      QueryString: |
+        filter message = "request completed" and duration_ms > 500
+        | stats avg(duration_ms) as avg_ms, max(duration_ms) as max_ms, count(*) as count by route
+        | sort max_ms desc
+
+  CallerActivityQueryDefinition:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: DalTime/Activity for one caller (sub)
+      QueryString: |
+        filter caller_sub = "<paste sub here>"
+        | fields timestamp, level, message, route, status, duration_ms
+        | sort timestamp asc
+
+  ClientErrorsQueryDefinition:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: DalTime/Client errors (frontend)
+      QueryString: |
+        filter source = "client" and level in ["ERROR", "WARN"]
+        | fields timestamp, event_type, message, device_type, os, platform, breakpoint
+        | sort timestamp desc
+        | limit 200
+
+  ClickTrailQueryDefinition:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: DalTime/Click trail for a session
+      QueryString: |
+        filter source = "client" and client_session_id = "<paste id here>"
+        | fields timestamp, event_type, target, route, message
+        | sort timestamp asc
+
+  ErrorsByDeviceQueryDefinition:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: DalTime/Errors by device type and OS
+      QueryString: |
+        filter level = "ERROR"
+        | stats count(*) as errors by device_type, os, platform
+        | sort errors desc
+
+  RageClicksQueryDefinition:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: DalTime/Rage clicks by target
+      QueryString: |
+        filter source = "client" and event_type = "rage_click"
+        | stats count(*) as rage_clicks by target
+        | sort rage_clicks desc
+        | limit 50
+
+
+Outputs:
+  ApiEndpoint:
+    Value: !Sub 'https://${DalTimeHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+  OrganizationsEndpoint:
+    Value: !Sub 'https://${DalTimeHttpApi}.execute-api.${AWS::Region}.amazonaws.com/organizations'
+  OrganizationsFunction:
+    Value: !GetAtt OrganizationsFunction.Arn
+  DalTimeTable:
+    Value: !Ref DalTimeTable

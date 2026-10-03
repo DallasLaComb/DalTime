@@ -1,0 +1,76 @@
+meta {
+  name: Generate Dummy Data
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/web-admin/generate-dummy-data
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{web_admin_token}}
+}
+
+body:json {
+  {
+    "year": 2026,
+    "month": 6
+  }
+}
+
+docs {
+  # POST /web-admin/generate-dummy-data
+
+  Generates dummy availability records and open shifts for a given month
+  across the Sunset Cafe seed organization. Web-Admin role required.
+
+  ## Request body
+  - `year` (integer, required): Full 4-digit year.
+  - `month` (integer, required): 1-indexed month (1 = January, 12 = December).
+
+  ## Valid date range
+  The requested month/year must fall within the window:
+  - Minimum (inclusive): the current server-side calendar month/year
+  - Maximum (inclusive): the current server-side month/year + 24 calendar months
+
+  ## Response (200)
+  ```json
+  { "message": "Generated dummy data for 6/2026: 12 availability records and 8 open shifts across 1 org(s)" }
+  ```
+
+  ## Error responses
+
+  ### 400 — month/year in the past
+  ```json
+  { "error": "month/year must not be in the past" }
+  ```
+  Example body that triggers this: `{ "year": 2026, "month": 5 }` (when current month is June 2026)
+
+  ### 400 — month/year more than 24 months in the future
+  ```json
+  { "error": "month/year must be within 24 months from now" }
+  ```
+  Example body that triggers this: `{ "year": 2028, "month": 7 }` (when current month is June 2026)
+
+  ### 400 — invalid field type or missing field
+  ```json
+  { "error": "year is required" }
+  { "error": "year must be an integer" }
+  { "error": "month is required" }
+  { "error": "month must be an integer" }
+  { "error": "month must be between 1 and 12 (1-indexed)" }
+  ```
+
+  ### 403 — caller is not a Web-Admin or their account is disabled
+  ```json
+  { "error": "Forbidden" }
+  ```
+
+  ### 500 — DynamoDB batch write failure after retries
+  ```json
+  { "error": "Internal server error" }
+  ```
+}

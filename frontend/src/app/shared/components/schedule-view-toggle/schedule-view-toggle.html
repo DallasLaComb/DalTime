@@ -1,0 +1,58 @@
+<button
+  type="button"
+  [class]="
+    viewMode() === 'day'
+      ? 'min-h-11 flex-1 rounded-md bg-white px-3 py-1.5 text-sm font-semibold sm:min-h-0 sm:flex-none text-gray-900 shadow-sm transition-all'
+      : 'min-h-11 flex-1 rounded-md px-3 py-1.5 text-sm font-medium sm:min-h-0 sm:flex-none text-gray-500 transition-all hover:text-gray-700'
+  "
+  data-testid="view-day"
+  (click)="viewModeChange.emit('day')"
+  (keydown.enter)="viewModeChange.emit('day')"
+  (keydown.space)="viewModeChange.emit('day')"
+>
+  Day
+</button>
+<button
+  type="button"
+  [class]="
+    viewMode() === 'week'
+      ? 'min-h-11 flex-1 rounded-md bg-white px-3 py-1.5 text-sm font-semibold sm:min-h-0 sm:flex-none text-gray-900 shadow-sm transition-all'
+      : 'min-h-11 flex-1 rounded-md px-3 py-1.5 text-sm font-medium sm:min-h-0 sm:flex-none text-gray-500 transition-all hover:text-gray-700'
+  "
+  data-testid="view-week"
+  (click)="viewModeChange.emit('week')"
+  (keydown.enter)="viewModeChange.emit('week')"
+  (keydown.space)="viewModeChange.emit('week')"
+>
+  Week
+</button>
+<button
+  type="button"
+  [class]="
+    viewMode() === 'month'
+      ? 'min-h-11 flex-1 rounded-md bg-white px-3 py-1.5 text-sm font-semibold sm:min-h-0 sm:flex-none text-gray-900 shadow-sm transition-all'
+      : 'min-h-11 flex-1 rounded-md px-3 py-1.5 text-sm font-medium sm:min-h-0 sm:flex-none text-gray-500 transition-all hover:text-gray-700'
+  "
+  data-testid="view-month"
+  (click)="viewModeChange.emit('month')"
+  (keydown.enter)="viewModeChange.emit('month')"
+  (keydown.space)="viewModeChange.emit('month')"
+>
+  Month
+</button>
+@if (showAvailability()) {
+  <button
+    type="button"
+    [class]="
+      viewMode() === 'availability'
+        ? 'min-h-11 flex-1 rounded-md bg-white px-3 py-1.5 text-sm font-semibold sm:min-h-0 sm:flex-none text-gray-900 shadow-sm transition-all'
+        : 'min-h-11 flex-1 rounded-md px-3 py-1.5 text-sm font-medium sm:min-h-0 sm:flex-none text-gray-500 transition-all hover:text-gray-700'
+    "
+    data-testid="view-availability"
+    (click)="viewModeChange.emit('availability')"
+    (keydown.enter)="viewModeChange.emit('availability')"
+    (keydown.space)="viewModeChange.emit('availability')"
+  >
+    Availability
+  </button>
+}
